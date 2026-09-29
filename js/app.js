@@ -275,8 +275,14 @@ function rsvpSectionHTML(h) {
       <div class="rsvp-list" aria-live="polite"><p class="muted">Loading who's coming…</p></div>
     </div>`;
   }
-  return `<p>RSVPs aren't in the app yet. Reply to the group invite so everyone knows who's coming.</p>
-    <button class="btn btn-secondary" type="button" data-copy-hike="${h.id}">${I.copy}<span>Copy invite for ${esc(h.dateShort)}</span></button>`;
+ return `<div class="rsvp-reply" data-reply="${h.id}">
+    <p>RSVPs aren't shared in the app yet — but you can reply in one tap and paste it into the group chat.</p>
+    <label class="rsvp-name"><span>Your name</span><input type="text" maxlength="40" autocomplete="given-name" data-reply-name value="${esc(store.get('fh:name', ''))}"></label>
+    <div class="btn-row">${RSVP_STATUSES.map((s, i) => `<button class="btn btn-secondary btn-choice" type="button" data-reply-status="${s}" aria-pressed="${i === 0}">${esc(RSVP_LABELS[s])}</button>`).join('')}</div>
+    <button class="btn btn-primary" type="button" data-copy-reply="${h.id}">${I.copy}<span>Copy my reply</span></button>
+    <p class="muted">This copies a message for you to paste in the group chat. It doesn't publish a shared guest list.</p>
+  </div>`;
+
 }
 
 function renderRsvpList(rsvps) {
