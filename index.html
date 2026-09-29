@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en-CA">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Fall Hike App</title>
+  <meta name="description" content="Five Saturday hikes near Toronto, Oct 3 to Oct 31: meeting times, trails, fees, directions and what to bring.">
+
+  <!-- Install / home screen -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1d3a2a">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Fall Hike">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+
+  <!-- Link previews in group chats -->
+  <meta property="og:title" content="Fall Hike App">
+  <meta property="og:description" content="Five Saturday hikes near Toronto, Oct 3 to Oct 31.">
+  <meta property="og:image" content="icons/icon-512.png">
+
+  <link rel="stylesheet" href="css/app.css">
+  <script type="module" src="js/app.js"></script>
+</head>
+<body>
+  <div id="status-scrim" aria-hidden="true"></div>
+
+  <div id="app">
+    <main id="views">
+      <section id="view-hikes" class="view" aria-label="Hikes"></section>
+      <section id="view-detail" class="view" aria-label="Hike details" hidden></section>
+      <section id="view-ask" class="view" aria-label="Ask" hidden></section>
+      <section id="view-share" class="view" aria-label="Share" hidden></section>
+    </main>
+
+    <nav class="tabbar" aria-label="Main">
+      <a class="tab active" href="#/" data-tab="hikes" aria-current="page">
+        <svg class="ic" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 19.5 9 8.5l3.6 6 2.4-3.8 6.5 8.8Z"/><path d="m7.2 11.6 1.8 1.4 1.7-1.6"/></svg>
+        <span>Hikes</span>
+      </a>
+      <a class="tab" href="#/ask" data-tab="ask" aria-current="false">
+        <svg class="ic" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 12a8 8 0 0 1-11.7 7.1L3.5 20.5l1.4-4.6A8 8 0 1 1 20.5 12Z"/><path d="M9.6 9.6a2.5 2.5 0 1 1 3.3 2.4c-.6.2-.9.7-.9 1.3v.4"/><path d="M12 16.4h.01"/></svg>
+        <span>Ask</span>
+      </a>
+      <a class="tab" href="#/share" data-tab="share" aria-current="false">
+        <svg class="ic" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5v11"/><path d="m7.8 7.7 4.2-4.2 4.2 4.2"/><path d="M8 11H6.5A1.5 1.5 0 0 0 5 12.5v6A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5v-6a1.5 1.5 0 0 0-1.5-1.5H16"/></svg>
+        <span>Share</span>
+      </a>
+    </nav>
+  </div>
+
+  <div id="install-sheet" hidden></div>
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <noscript>
+    <p style="padding:24px;font:17px/1.5 system-ui,sans-serif;background:#fffaf2;color:#2a2019;position:fixed;inset:0;z-index:99">
+      Fall Hike App needs JavaScript. Turn it on in your browser settings, then reload.
+    </p>
+  </noscript>
+</body>
+</html>
