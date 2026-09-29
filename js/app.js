@@ -790,6 +790,22 @@ document.addEventListener('click', async (e) => {
     flashCopied(t, ok, 'Copied');
     return;
   }
+  if (t.matches('[data-reply-status]')) {
+    $$('#view-detail [data-reply-status]').forEach((b) => b.setAttribute('aria-pressed', b === t ? 'true' : 'false'));
+    return;
+  }
+  if (t.matches('[data-copy-reply]')) {
+    const h = hikeById(t.dataset.copyReply);
+    const input = $('#view-detail [data-reply-name]');
+    const name = (input?.value || '').trim().slice(0, 40);
+    if (!name) { toast('Add your name first'); input?.focus(); return; }
+    store.set('fh:name', name);
+    const sel = $('#view-detail [data-reply-status][aria-pressed="true"]');
+    const ok = await copyText(replyText(h, name, sel ? sel.dataset.replyStatus : 'coming'));
+    toast(ok ? 'Reply copied — paste it in the group chat' : 'Copy failed. Long-press to copy manually.');
+    flashCopied(t, ok, 'Copied');
+    return;
+  }
   if (t.matches('[data-native-share]')) {
     try {
       await navigator.share({ title: APP.name, text: 'Five Saturday hikes near Toronto, Oct 3 to Oct 31.', url: appUrl() });
