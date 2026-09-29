@@ -412,6 +412,7 @@ body.kb .tabbar { display: none; }
 .btn-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; }
 .btn-row .btn { margin-top: 10px; }
 .btn-choice { margin: 0; }
+.btn-choice[aria-pressed="true"] { background: var(--action); color: #fff; }
 
 /* ── Ask ─────────────────────────────────────────────────── */
 #view-ask { display: flex; flex-direction: column; overflow: hidden; }
