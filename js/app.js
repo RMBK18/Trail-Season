@@ -1,5 +1,5 @@
 import { HIKES, BASICS, APP, hikeById } from './data.js';
-import { esc, mapsUrl, meetMs, statusOf, nextHike, isHikeDay, countdownParts } from './lib.js';
+import { esc, mapsUrl, meetMs, endMs, statusOf, nextHike, isHikeDay, countdownParts } from './lib.js';
 import { answer, askLiveAI, isLiveAIOn, DONT_KNOW, SUGGESTIONS } from './ask.js';
 import { isRsvpLive, setRsvp, subscribeRsvps, RSVP_STATUSES, RSVP_LABELS } from './rsvp.js';
 import { I } from './icons.js';
