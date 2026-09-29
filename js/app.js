@@ -313,6 +313,10 @@ function stopRsvp() {
   if (rsvpUnsub) { try { rsvpUnsub(); } catch { /* already closed */ } }
   rsvpUnsub = null;
 }
+function replyText(h, name, status) {
+  const verb = status === 'maybe' ? "I'm a maybe" : status === 'cant' ? "I can't make it" : "I'm in";
+  return `🍂 Hi everyone, this is ${name} — ${verb} for ${h.dateShort} at ${h.park}! Meet ${h.meet.time}${h.meet.place ? ` at ${h.meet.place}` : ''}.`;
+}
 
 async function loadWeather(h) {
   const w = await getWeather(h.id);
