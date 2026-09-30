@@ -45,7 +45,7 @@ function hasKw(q, kw) {
 // ── Which hike is the question about? ───────────────────────
 const ALIASES = {
   'forks-of-the-credit': ['forks of the credit', 'forks', 'credit', 'caledon', 'kettle lake', 'kettle trail', 'kettle', 'meadow trail', 'cataract falls', 'mono cliffs'],
-  'dundas-valley': ['dundas valley', 'dundas', 'hermitage ruins', 'hermitage', 'main loop', 'heritage trail', 'trail centre', 'trail center', 'thanksgiving', 'headwaters', 'monarch', 'hilton falls'],
+  'dundas-valley': ['dundas valley', 'dundas peak', 'tew falls', "tew's falls", 'tews falls', 'spencer gorge', 'dundas', 'hermitage ruins', 'hermitage', 'main loop', 'heritage trail', 'trail centre', 'trail center', 'thanksgiving', 'headwaters', 'monarch', 'hilton falls'],
   'rattlesnake-point': ['rattlesnake point', 'rattlesnake', 'buffalo crag', 'nassagaweya', 'vista adventure', 'appleby line', 'appleby', 'milton', 'mount nemo', 'mt nemo'],
   'balls-falls': ['balls falls', "ball's falls", 'ball falls', 'balls', 'jordan', 'niagara', 'glen elgin', 'cataract trail', 'upper falls', 'lower falls', 'rock point'],
   rouge: ['rouge national urban park', 'rouge park', 'rouge valley', 'rouge', 'scarborough', 'twyn rivers', 'vista trail', 'mast trail', 'orchard trail', 'glen rouge', 'zoo road', 'halloween', 'crawford lake'],
@@ -53,13 +53,13 @@ const ALIASES = {
 
 // Phrases removed before topic detection so "Balls Falls" doesn't trigger "falls" (highlights), etc.
 const NAME_PHRASES = [
-  "ball's falls", 'balls falls', 'ball falls', 'cataract falls', 'upper falls', 'lower falls', 'hilton falls',
+  "ball's falls", 'balls falls', 'ball falls', 'cataract falls', 'upper falls', 'lower falls', 'hilton falls', 'dundas peak', "tew's falls", 'tews falls', 'tew falls', 'spencer gorge',
   'cataract trail', 'kettle trail', 'meadow trail', 'heritage trail', 'main loop trail', 'main loop', 'buffalo crag trail',
   'vista adventure trail', 'vista trail', 'mast trail', 'orchard trail', 'trail centre', 'trail center',
   'forks of the credit', 'rouge national urban park', 'twyn rivers drive', 'twyn rivers', 'zoo road', 'glen rouge',
 ];
 
-const BACKUP_NAMES = ['mono cliffs', 'hilton falls', 'mount nemo', 'mt nemo', 'rock point', 'crawford lake', 'headwaters', 'monarch', 'glen rouge'];
+const BACKUP_NAMES = ['mono cliffs', 'hilton falls', 'mount nemo', 'mt nemo', 'rock point', 'crawford lake', 'headwaters', 'monarch', 'glen rouge', 'dundas peak', 'tew falls', "tew's falls", 'tews falls', 'spencer gorge'];
 
 const ORDINALS = { first: 1, '1st': 1, second: 2, '2nd': 2, third: 3, '3rd': 3, fourth: 4, '4th': 4, fifth: 5, '5th': 5, last: 5, final: 5 };
 
@@ -135,7 +135,7 @@ const TOPICS = [
   { id: 'trails', kws: ['trail', 'trails', 'km', 'distance', '~how long', 'loop', 'length', 'kilometres', 'kilometers', 'miles', 'route', 'routes'] },
   { id: 'highlights', kws: ['~see', 'view', 'views', 'highlight', 'highlights', 'beautiful', 'pretty', 'scenic', 'scenery', 'waterfall', 'waterfalls', 'falls', 'special', 'colours', 'colors', 'colour', 'color', 'leaves', 'foliage', 'photo', 'photos', 'pictures', 'lookout', 'worth it'] },
   { id: 'bring', kws: ['~bring', 'pack', 'packing', 'wear', 'wearing', 'clothes', 'clothing', 'gear', 'checklist', 'shoes', 'boots', 'pants', 'prepare', 'prep', 'what do i need', 'what should i need'] },
-  { id: 'backup', kws: ['backup', 'back up', 'back-up', 'plan b', 'alternative', 'alternatives', 'alternate', 'fallback', 'fall back', 'instead', 'crowd', 'crowds', 'crowded', 'busy', 'full'] },
+  { id: 'backup', kws: ['backup', 'backups', 'back up', 'back ups', 'back-up', 'plan b', 'alternative', 'alternatives', 'alternate', 'fallback', 'fall back', 'instead', 'crowd', 'crowds', 'crowded', 'busy', 'full'] },
   { id: 'food', kws: ['food', 'restaurant', 'restaurants', 'coffee', 'cafe', 'cafes', 'eat', 'eating', 'lunch', 'breakfast', 'brunch', 'dinner', 'snack bar', 'tim hortons', 'tims', 'starbucks', 'hungry', 'grab a bite', 'bite to eat'] },
   { id: 'swim', kws: ['swim', 'swimming', 'swimsuit', 'bathing suit', 'beach', 'beaches', 'wade', 'wading'] },
   { id: 'bikes', kws: ['bike', 'bikes', 'biking', 'bicycle', 'bicycles', 'cycling', 'cyclist', 'mountain bike', 'mountain biking', 'mtb', 'ebike', 'e-bike', 'scooter'] },
@@ -266,9 +266,12 @@ const ANSWERS = {
   backup: {
     one: (h) =>
       `<p>Backup: <b>${esc(h.backup.name)}</b>.</p>` +
+      (h.backup.note ? `<p>${esc(h.backup.note)}</p>` : '') +
+      (h.backup.booking ? ext(h.backup.booking.url, h.backup.booking.label) : '') +
       (h.alerts.find((a) => a.kind === 'crowd') ? `<p>${esc(h.alerts.find((a) => a.kind === 'crowd').title)}. ${esc(h.alerts.find((a) => a.kind === 'crowd').text)}</p>` : '') +
-      ext(mapsUrl(h.backup.maps), `Directions to ${h.backup.name}`),
-    all: () => list(HIKES.map((h) => `${who(h)}: ${esc(h.backup.name)}`)),
+      ext(mapsUrl(h.backup.maps), `Directions to ${h.backup.name}`) +
+      (h.backup.then ? `<p>Second backup: <b>${esc(h.backup.then.name)}</b>.</p>` + ext(mapsUrl(h.backup.then.maps), `Directions to ${h.backup.then.name}`) : ''),
+    all: () => list(HIKES.map((h) => `${who(h)}: ${esc(h.backup.name)}${h.backup.then ? `, then ${esc(h.backup.then.name)}` : ''}`)),
   },
   picnic: {
     one: (h) => (h.picnic ? `<p>Yes, ${esc(h.park)} has ${esc(h.picnic.toLowerCase())}.</p>` : notInPlan('picnic tables', h)),
@@ -400,8 +403,12 @@ function answerFromPlan(raw, now) {
     };
   }
 
-  // Naming a backup park or fallback trailhead on its own means "tell me about the backup".
-  if (!strong.length && hikes.length && BACKUP_NAMES.some((n) => hasKw(q, n))) strong.push('backup');
+  // Naming a backup park or fallback trailhead on its own means "tell me about the backup",
+  // and so does asking about its fees or booking ("do we need to book Dundas Peak?").
+  if (hikes.length && BACKUP_NAMES.some((n) => hasKw(q, n))) {
+    if (!strong.length) strong.push('backup');
+    else if (strong.includes('fees') && !strong.includes('backup')) strong.splice(strong.indexOf('fees'), 1, 'backup');
+  }
 
   if (!strong.length) {
     if (hikes.length) return { matched: true, html: hikes.slice(0, 2).map(overview).join('<hr>') };

@@ -682,9 +682,13 @@ function renderDetail(h) {
 
       <section class="block">
         <h2>Backup plan</h2>
-        <p class="lead"><b>${esc(h.backup.name)}</b></p>
         ${h.fallbackTrailheads ? `<p>If ${esc(h.shortName)} is too busy, fallback trailheads: ${esc(h.fallbackTrailheads.join(', '))}.</p>` : ''}
+        <p class="lead"><b>${esc(h.backup.name)}</b></p>
+        ${h.backup.note ? `<p>${esc(h.backup.note)}</p>` : ''}
+        ${h.backup.booking ? `<a class="btn btn-primary" href="${esc(h.backup.booking.url)}" target="_blank" rel="noopener">${I.ext}<span>${esc(h.backup.booking.label)}</span></a><p class="fine">${esc(h.backup.booking.host)}</p>` : ''}
         <a class="btn btn-secondary" href="${esc(mapsUrl(h.backup.maps))}" target="_blank" rel="noopener">${I.swap}<span>Directions to ${esc(h.backup.name)}</span></a>
+        ${h.backup.then ? `<p class="sub-h">Second backup</p><p class="lead"><b>${esc(h.backup.then.name)}</b></p>
+        <a class="btn btn-secondary" href="${esc(mapsUrl(h.backup.then.maps))}" target="_blank" rel="noopener">${I.swap}<span>Directions to ${esc(h.backup.then.name)}</span></a>` : ''}
       </section>
 
       ${h.photo ? `<p class="photo-credit">${photoCredit(h.photo)}</p>` : ''}

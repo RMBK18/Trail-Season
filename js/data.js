@@ -135,10 +135,15 @@ export const HIKES = [
     drive: { text: '~75–90 min', short: '~75–90 min' },
     fee: {
       amount: '$11.50/vehicle',
-      note: 'No reservation.',
-      short: 'no reservation',
+      note: 'No reservation needed. You can buy the day pass online up to 5 days ahead (up to 6 people and 1 car per pass) and scan the barcode at the gate.',
+      short: 'day pass online or on arrival',
     },
-    booking: null,
+    booking: {
+      url: 'https://conservationhamilton.ca/day-pass/',
+      host: 'conservationhamilton.ca',
+      label: 'Buy a Dundas Valley day pass',
+      required: false,
+    },
     washrooms: 'Washrooms at the Trail Centre',
     noWashrooms: false,
     dogs: 'Dogs OK',
@@ -149,9 +154,16 @@ export const HIKES = [
     alerts: [
       { kind: 'crowd', title: 'Thanksgiving weekend: extremely busy', text: 'Fallback trailheads: Headwaters, Monarch.' },
     ],
-    bring: ['$11.50 per vehicle for entry (no reservation)'],
+    bring: ['$11.50 per vehicle: a day pass bought online, or pay on arrival'],
     maps: 'Dundas Valley Conservation Area Trail Centre, 650 Governors Rd, Dundas, ON L9H 5E3',
-    backup: { name: 'Hilton Falls, Milton', maps: 'Hilton Falls, Milton, ON' },
+    // Backup: Dundas Peak needs a reservation; Hilton Falls if it's sold out.
+    backup: {
+      name: 'Dundas Peak & Tew Falls, Dundas',
+      maps: 'Dundas Peak and Tew Falls parking lot, 581 Harvest Rd, Dundas, ON',
+      note: 'Reservation required from Sept 26 to Nov 8: no drive-up entry. Book a 2-hour Dundas Peak & Tew Falls slot, one car per booking. Bookings open 9 days ahead (Thu Oct 1) and close at midnight Fri Oct 9. $11 per car, $5.50 per passenger and a $10 booking fee. Park at 581 Harvest Rd; about 1.8 km to the peak and back.',
+      booking: { url: 'https://conservationhamilton.ca/spencer-gorge-reservations/', host: 'conservationhamilton.ca', label: 'Reserve Dundas Peak' },
+      then: { name: 'Hilton Falls, Milton', maps: 'Hilton Falls, Milton, ON' },
+    },
     fallbackTrailheads: ['Headwaters', 'Monarch'],
     accent: 'forest',
     photo: {
