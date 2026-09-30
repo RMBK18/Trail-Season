@@ -26,6 +26,9 @@ const levelBadges = (h) => badge(h.level) + (h.optionLevel ? badge(h.optionLevel
 const kidsTag = (h) =>
   KIDS_LABELS[h.kids] ? `<span class="kids-tag kids-${esc(h.kids)}">${I.users}${esc(KIDS_LABELS[h.kids])}</span>` : '';
 const easiestTrail = (h) => h.trails.find((t) => t.level === 'EASY') || h.trails[0];
+// Credit line the photo licences require (author, licence, source; photos are cropped).
+const photoCredit = (p, what = 'Photo') =>
+  p ? `${what}: <a href="${esc(p.source)}" target="_blank" rel="noopener">${esc(p.author)}</a>, ${p.licenseUrl ? `<a href="${esc(p.licenseUrl)}" target="_blank" rel="noopener">${esc(p.license)}</a>` : esc(p.license)}, via Wikimedia Commons (cropped)` : '';
 const pad2 = (n) => String(n).padStart(2, '0');
 
 // ── Platform detection (install instructions) ───────────────
@@ -127,7 +130,8 @@ function cardHTML(h, now, nx) {
   return `
   <li class="stop stop-${st}${isNext ? ' stop-next' : ''}">
     <span class="blaze blaze-${h.level.toLowerCase()}" aria-hidden="true"></span>
-    <a class="card" href="#/hike/${h.id}" data-push>
+    <a class="card${h.photo ? ' has-photo' : ''}" href="#/hike/${h.id}" data-push>
+      ${h.photo ? `<img class="card-photo" src="${esc(h.photo.src)}" alt="" loading="lazy" decoding="async">` : ''}
       <span class="card-top"><span class="card-date">${esc(h.dateShort)}</span>${chip}</span>
       <h3 class="card-park">${esc(h.park)}</h3>
       <span class="card-area">${esc(h.area)}</span>
@@ -181,10 +185,13 @@ function renderHome() {
   homeKey = homeStateKey(now);
   const showGetApp = !isStandalone() && (isIOS || isAndroid);
   $('#view-hikes').innerHTML = `
-    <header class="canopy">
+    <header class="canopy${APP.photo ? ' has-photo' : ''}">
+      ${APP.photo ? `<img class="canopy-photo" src="${esc(APP.photo.src)}" alt="" decoding="async">` : ''}
       <button id="admin-btn" style="position:absolute;top:calc(var(--safe-t) + 12px);right:14px;width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.3);color:#fff;font-size:20px;cursor:pointer;" title="Edit hikes">⚙️</button>
-      <h1 class="large-title">Fall Hike App</h1>
-      <p class="canopy-sub">Five Saturdays near Toronto, Oct 3 to Oct 31</p>
+      <p class="canopy-eyebrow">${esc(APP.name)}</p>
+      <h1 class="large-title">${esc(APP.tagline || APP.name)}</h1>
+      <p class="canopy-sub">${esc(APP.intro || 'Five Saturdays near Toronto, Oct 3 to Oct 31')}</p>
+      ${APP.chips ? `<div class="glass-chips">${APP.chips.map((c) => `<span class="glass-chip">${esc(c)}</span>`).join('')}</div>` : ''}
       ${signHTML(now, allHikes)}
     </header>
     <section class="list-wrap" aria-labelledby="list-h">
@@ -192,6 +199,7 @@ function renderHome() {
       <h2 id="list-h" class="section-h">${getHikes().length === 5 ? 'The five Saturdays' : 'Upcoming Hikes'}</h2>
       <ol class="trail">${allHikes.map((h) => cardHTML(h, now, nx)).join('')}</ol>
       <p class="list-foot">Tap a hike for trails, fees, directions and what to bring.</p>
+      ${APP.photo ? `<p class="photo-credit">${photoCredit(APP.photo, 'Top photo')}. Park photos are credited on each hike page.</p>` : ''}
     </section>`;
   tickSign();
 }
@@ -362,8 +370,8 @@ function renderDetail(h) {
       <span class="nav-title">${esc(h.shortName)}</span>
       <button class="nav-action" type="button" data-copy-hike="${h.id}" aria-label="Copy invite">${I.share}</button>
     </div>
-    <header class="hero hero-${h.accent}">
-      ${heroArt(h)}
+    <header class="hero hero-${h.accent}${h.photo ? ' has-photo' : ''}">
+      ${h.photo ? `<img class="hero-photo" src="${esc(h.photo.src)}" alt="${esc(h.photo.alt)}" decoding="async">` : heroArt(h)}
       <p class="hero-date">${esc(h.dateLong)}</p>
       <h1 class="hero-title">${esc(h.park)}</h1>
       <p class="hero-area">${esc(h.area)}</p>
@@ -374,7 +382,7 @@ function renderDetail(h) {
       <div class="facts">
         <div class="fact">${I.clock}<span class="fact-k">Meet</span><span class="fact-v">${esc(h.meet.time)}</span></div>
         <div class="fact">${I.car}<span class="fact-k">Drive</span><span class="fact-v">${esc(h.drive.short)}</span></div>
-        <div class="fact">${I.ticket}<span class="fact-k">Fee</span><span class="fact-v">${esc(h.fee.amount)}</span></div>
+        <div class="fact">${I.ticket}<span class="fact-k">Fee</span><span class="fact-v">${esc(h.fee.amount).replace('/', '/<wbr>')}</span></div>
       </div>
 
       ${alertsHTML(h)}
@@ -442,6 +450,7 @@ function renderDetail(h) {
         <h2>Who's coming</h2>
         ${rsvpSectionHTML(h)}
       </section>
+      ${h.photo ? `<p class="photo-credit">${photoCredit(h.photo)}</p>` : ''}
     </div>`;
 
   // Show the park name in the nav bar once the big title scrolls away

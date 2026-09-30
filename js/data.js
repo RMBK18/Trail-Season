@@ -13,6 +13,19 @@ export const APP = {
   // All five hikes fall in Eastern Daylight Time (DST ends Nov 1, 2026).
   tzOffset: '-04:00',
   timeZone: 'America/Toronto',
+  // Home screen headline, intro and chips (over the photo).
+  tagline: 'Five weekends. Five shades of fall.',
+  intro: 'A low-pressure hiking plan for friends: easy-to-moderate routes, memorable views and a clear plan for every Saturday in October.',
+  chips: ['5 Saturdays', 'Easy → moderate', '45 min–2 hr from Toronto'],
+  // Photos are from Wikimedia Commons under free licences; each is credited in the app.
+  photo: {
+    src: 'img/hikes/season.jpg',
+    alt: 'A hiker on a forest trail in fall',
+    author: 'Ajwm8103',
+    license: 'CC BY-SA 4.0',
+    licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0',
+    source: 'https://commons.wikimedia.org/wiki/File:Man_walking_through_Rattlesnake_Point.jpg',
+  },
 };
 
 // General hiking basics shown on every hike's checklist.
@@ -90,6 +103,14 @@ export const HIKES = [
     backup: { name: 'Mono Cliffs Provincial Park', maps: 'Mono Cliffs Provincial Park, ON' },
     fallbackTrailheads: null,
     accent: 'rust',
+    photo: {
+      src: 'img/hikes/forks-of-the-credit.jpg',
+      alt: 'A lake ringed with orange and red fall trees, reflecting the clouds',
+      author: 'chsyang',
+      license: 'Public domain',
+      licenseUrl: null,
+      source: 'https://commons.wikimedia.org/wiki/File:Forks_of_Credit_Provincial_Park%EF%BC%8CCanada_(53267092933).jpg',
+    },
   },
   {
     id: 'dundas-valley',
@@ -133,6 +154,14 @@ export const HIKES = [
     backup: { name: 'Hilton Falls, Milton', maps: 'Hilton Falls, Milton, ON' },
     fallbackTrailheads: ['Headwaters', 'Monarch'],
     accent: 'forest',
+    photo: {
+      src: 'img/hikes/dundas-valley.jpg',
+      alt: 'The Dundas Valley Conservation Area trail sign among fall trees',
+      author: 'Jaydenfromcanada',
+      license: 'CC BY-SA 4.0',
+      licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0',
+      source: 'https://commons.wikimedia.org/wiki/File:DundasValleyPark.jpg',
+    },
   },
   {
     id: 'rattlesnake-point',
@@ -176,6 +205,14 @@ export const HIKES = [
     backup: { name: 'Mount Nemo, Burlington', maps: 'Mount Nemo, Burlington, ON' },
     fallbackTrailheads: null,
     accent: 'amber',
+    photo: {
+      src: 'img/hikes/rattlesnake-point.jpg',
+      alt: 'View from the escarpment over farmland and fall trees',
+      author: 'Emily CA (MPL)',
+      license: 'CC BY-SA 4.0',
+      licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0',
+      source: 'https://commons.wikimedia.org/wiki/File:Rattlesnake_Point_Milton_Ontario.jpg',
+    },
   },
   {
     id: 'balls-falls',
@@ -221,6 +258,14 @@ export const HIKES = [
     backup: { name: 'Rock Point Provincial Park', maps: 'Rock Point Provincial Park, ON' },
     fallbackTrailheads: null,
     accent: 'falls',
+    photo: {
+      src: 'img/hikes/balls-falls.jpg',
+      alt: 'A waterfall behind red and yellow fall leaves',
+      author: 'John Vetterli from Toronto, Canada',
+      license: 'CC BY-SA 2.0',
+      licenseUrl: 'https://creativecommons.org/licenses/by-sa/2.0',
+      source: 'https://commons.wikimedia.org/wiki/File:Ball%27s_Falls_(272790578).jpg',
+    },
   },
   {
     id: 'short-hills',
@@ -266,6 +311,14 @@ export const HIKES = [
     backup: { name: 'Crawford Lake, Milton', maps: 'Crawford Lake, Milton, ON' },
     fallbackTrailheads: null,
     accent: 'dawn',
+    photo: {
+      src: 'img/hikes/short-hills.jpg',
+      alt: 'A leaf-covered forest trail in autumn',
+      author: 'KokoHoarse',
+      license: 'CC BY-SA 4.0',
+      licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0',
+      source: 'https://commons.wikimedia.org/wiki/File:Short_Hills_Provincial_Park_-Autumn_trail.jpg',
+    },
   },
 ];
 
