@@ -1,6 +1,6 @@
 import { HIKES, BASICS, APP, hikeById } from './data.js';
 import { esc, mapsUrl, meetMs, endMs, statusOf, nextHike, isHikeDay, countdownParts } from './lib.js';
-import { answer, askLiveAI, isLiveAIOn, DONT_KNOW, SUGGESTIONS } from './ask.js';
+import { answer, askLiveAI, isLiveAIOn, DONT_KNOW, FORWARDED, OFF_TOPIC_REPLY, SUGGESTIONS } from './ask.js';
 import { isRsvpLive, setRsvp, subscribeRsvps, RSVP_STATUSES, RSVP_LABELS } from './rsvp.js';
 import { I } from './icons.js';
 import { getWeather, describeWeather } from './weather.js';
@@ -477,29 +477,58 @@ function addMsg(kind, content, { html = false } = {}) {
   return el;
 }
 
+// Step 3: a question nobody could answer goes to the organizer. The asker sends
+// it through the phone's share menu (or it's copied), so the organizer can reply.
+function addSendButton(el, q) {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'ans-link';
+  b.dataset.sendQuestion = q;
+  b.textContent = `Send to ${APP.askPerson}`;
+  el.appendChild(b);
+}
+
+async function sendQuestion(q) {
+  const text = `Question for ${APP.askPerson} about the fall hikes: ${q}`;
+  if (navigator.share) {
+    try {
+      await navigator.share({ text });
+      return;
+    } catch (err) {
+      if (err?.name === 'AbortError') return; // user closed the share menu
+    }
+  }
+  const ok = await copyText(text);
+  toast(ok ? `Copied. Paste it to ${APP.askPerson} or the group chat.` : 'Copy failed. Long-press your question to copy it.');
+}
+
+// Three steps: 1. offline answers from the plan, 2. live AI (answers only from
+// the plan), 3. anything still unanswered goes to the organizer.
 async function ask(question) {
   const q = question.trim();
   if (!q) return;
   addMsg('me', q);
   const res = answer(q);
   if (res.matched) {
-    addMsg('bot', res.html, { html: true });
+    const el = addMsg('bot', res.html, { html: true });
+    if (res.unsure) addSendButton(el, q);
     return;
   }
   // PHASE 2 hook: only runs when CONFIG.aiEndpoint is set (see js/ask.js → askLiveAI).
   if (!isLiveAIOn()) {
-    addMsg('bot', DONT_KNOW);
+    addSendButton(addMsg('bot', DONT_KNOW), q);
     return;
   }
   const typing = addMsg('bot typing', '<span></span><span></span><span></span>', { html: true });
   const ai = await askLiveAI(q);
   typing.remove();
-  if (ai) {
-    const el = addMsg('bot', ai);
-    el.insertAdjacentHTML('beforeend', '<p class="msg-fine">Live answer</p>');
-  } else {
-    addMsg('bot', DONT_KNOW);
+  if (ai?.answer) {
+    const el = addMsg('bot', ai.answer);
+    el.insertAdjacentHTML('beforeend', '<p class="msg-fine">Live answer, from the hike plan</p>');
+    return;
   }
+  const reply = ai?.offTopic ? OFF_TOPIC_REPLY : ai?.forwarded ? FORWARDED : DONT_KNOW;
+  addSendButton(addMsg('bot', reply), q);
 }
 
 // ═════════════════════════════════════════════════════════════
@@ -814,6 +843,10 @@ document.addEventListener('click', async (e) => {
   }
   if (t.matches('[data-suggest]')) {
     ask(t.dataset.suggest);
+    return;
+  }
+  if (t.matches('[data-send-question]')) {
+    sendQuestion(t.dataset.sendQuestion);
     return;
   }
   if (t.matches('[data-rsvp-status]')) {

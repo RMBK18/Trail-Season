@@ -444,6 +444,7 @@ body.kb .tabbar { display: none; }
   font-size: 14.5px; font-weight: 700; text-decoration: none;
 }
 .ans-link-soft { background: var(--surface-2); color: var(--link); box-shadow: inset 0 0 0 1px var(--line); }
+button.ans-link { border: 0; cursor: pointer; }
 .msg.typing { display: flex; gap: 5px; padding: 14px 16px; }
 .msg.typing span { width: 7px; height: 7px; border-radius: 50%; background: var(--ink-2); animation: blink 1.2s infinite both; }
 .msg.typing span:nth-child(2) { animation-delay: 0.2s; }

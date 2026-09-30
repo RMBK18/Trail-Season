@@ -9,6 +9,8 @@ import { CONFIG } from './config.js';
 import { esc, mapsUrl, nextHike, torontoDateISO } from './lib.js';
 
 export const DONT_KNOW = `I don't know that one — ask ${APP.askPerson}!`;
+export const FORWARDED = `I don't know that one yet, so I've passed it on to ${APP.askPerson}. To get a reply, send it yourself too:`;
+export const OFF_TOPIC_REPLY = `I can only help with the fall hikes.`;
 
 export const SUGGESTIONS = [
   'What time do we meet on Oct 3?',
@@ -114,6 +116,7 @@ function detectHikes(q, now) {
 // A keyword starting with "~" is soft: it only counts when no other
 // (non-weak) topic has a hard match. "weak" topics only answer on their own.
 const TOPICS = [
+  { id: 'emergency', kws: ['emergency', '911', 'ambulance', 'injured', 'injury', 'accident', 'bleeding', 'broken leg', 'broken arm', 'broke my', 'sprained', "i'm lost", 'im lost', 'i am lost', 'we are lost', "we're lost", 'were lost', 'got lost'] },
   { id: 'cancel', kws: ['cancel', 'cancels', 'cancelled', 'canceled', 'cancellation', 'postpone', 'postponed', 'reschedule', 'rescheduled', 'rain or shine', 'rain date', 'rain plan', 'if it rains', "if it's raining", 'if its raining', 'in the rain', 'bad weather', 'still on', 'still happening', 'called off', 'call it off'] },
   { id: 'carpool', kws: ['carpool', 'carpools', 'carpooling', 'car pool', 'rideshare', 'ride share', 'need a ride', 'get a ride', 'give me a ride', 'give a ride', 'a lift', 'who is driving', "who's driving", 'whos driving', 'spare seat', 'spare seats', 'empty seat', 'empty seats'] },
   { id: 'rsvp', kws: ['rsvp', 'who is coming', "who's coming", 'whos coming', 'who is going', "who's going", 'whos going', 'attending', 'sign up', 'signup', 'count me in', 'headcount', "i'm in", 'im in', 'how many people', 'how many of us', 'who else'] },
@@ -271,6 +274,7 @@ const ANSWERS = {
         : notInPlan('a barrier-free trail', h),
     all: () => `<p>The only barrier-free trail in the plan is the <b>Palaeozoic Path</b> at Short Hills (Sat Oct 31): 0.8 km to the Swayze Falls viewpoint.</p>`,
   },
+  emergency: { one: () => ANSWERS.emergency.all(), all: () => `<p><b>${esc(GROUP.emergency)}</b></p>` },
   kids: {
     one: (h) => {
       const t = easiestTrail(h);
@@ -335,14 +339,22 @@ function schedule() {
 
 /**
  * Answer a question from the hike plan.
- * @returns {{ html: string, matched: boolean }}
+ * unsure: part of the question wasn't covered ("ask Summan"), so the app
+ * offers to send it to the organizer.
+ * @returns {{ html: string, matched: boolean, unsure: boolean }}
  */
 export function answer(raw, now = new Date()) {
+  const res = answerFromPlan(raw, now);
+  return { ...res, unsure: res.html.includes(esc(DONT_KNOW)) };
+}
+
+function answerFromPlan(raw, now) {
   const q = norm(raw);
   if (!q) return { html: '', matched: false };
 
   const { hikes, badDate, none } = detectHikes(q, now);
   const { strong, weak, offTopic, anyHardStrong } = detectTopics(q);
+  if (strong.includes('emergency')) return { matched: true, html: ANSWERS.emergency.all() };
 
   // The question is about something the plan doesn't cover: don't guess.
   if (offTopic && !anyHardStrong) return { html: dontKnow(), matched: false };
@@ -397,11 +409,13 @@ export function answer(raw, now = new Date()) {
 // always returns null and the user sees DONT_KNOW.
 //
 // CONFIG.aiEndpoint must point at YOUR server (the Cloudflare Worker in /phase2/ai-worker/).
-// That server holds ANTHROPIC_API_KEY, adds the hike plan as context, calls
-// the Anthropic Messages API and returns { "answer": "..." }.
+// That server holds ANTHROPIC_API_KEY, answers only from the hike plan, and
+// returns { status: 'answered', answer } or { status: 'unanswered' | 'off_topic',
+// forwarded } (forwarded = the organizer got an alert).
 // Never call api.anthropic.com from this file and never put a key here.
 //
-// The returned string is shown with textContent (never innerHTML).
+// Returns { answer } or { answer: null, forwarded, offTopic }, or null when the
+// Worker can't be reached. The answer is shown with textContent (never innerHTML).
 // ═════════════════════════════════════════════════════════════
 export const isLiveAIOn = () => Boolean(CONFIG.aiEndpoint);
 
@@ -416,9 +430,11 @@ export async function askLiveAI(question) {
       body: JSON.stringify({ question: String(question).slice(0, 500) }),
       signal: ctrl.signal,
     });
-    if (!res.ok) return null;
-    const data = await res.json();
-    return typeof data.answer === 'string' && data.answer.trim() ? data.answer.trim() : null;
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.status === 'answered' && typeof data.answer === 'string' && data.answer.trim()) {
+      return { answer: data.answer.trim() };
+    }
+    return { answer: null, forwarded: data.forwarded === true, offTopic: data.status === 'off_topic' };
   } catch {
     return null;
   } finally {
