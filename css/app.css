@@ -561,7 +561,7 @@ body.kb .tabbar { display: none; }
 .bar-title { font-size: 30px; line-height: 1.1; font-weight: 800; }
 .bar-eyebrow { font-size: 12.5px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(255, 255, 255, 0.8); }
 .bar.has-photo { padding-top: calc(var(--safe-t) + 34px); padding-bottom: 18px; background: var(--forest-deep); }
-.bar-photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 40%; }
+.bar-photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 72%; }
 .bar.has-photo::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(8, 18, 12, 0.35) 0%, rgba(8, 18, 12, 0.78) 100%); }
 .bar.has-photo > :not(.bar-photo) { position: relative; z-index: 1; }
 .bar.has-photo .bar-title { margin-top: 2px; font-size: 34px; color: #fff; text-shadow: 0 2px 14px rgba(0, 0, 0, 0.4); }
