@@ -17,7 +17,7 @@ export const SUGGESTIONS = [
   'What time do we meet on Oct 3?',
   'How much is Balls Falls?',
   'Can I bring my dog?',
-  'Washrooms at Short Hills?',
+  'Parking at Rouge Park?',
   'How hard is Rattlesnake Point?',
   'What should I bring?',
   'How long is the drive to Dundas?',
@@ -48,18 +48,18 @@ const ALIASES = {
   'dundas-valley': ['dundas valley', 'dundas', 'hermitage ruins', 'hermitage', 'main loop', 'heritage trail', 'trail centre', 'trail center', 'thanksgiving', 'headwaters', 'monarch', 'hilton falls'],
   'rattlesnake-point': ['rattlesnake point', 'rattlesnake', 'buffalo crag', 'nassagaweya', 'vista adventure', 'appleby line', 'appleby', 'milton', 'mount nemo', 'mt nemo'],
   'balls-falls': ['balls falls', "ball's falls", 'ball falls', 'balls', 'jordan', 'niagara', 'glen elgin', 'cataract trail', 'upper falls', 'lower falls', 'rock point'],
-  'short-hills': ['short hills', 'shorthills', 'short hill', 'st. catharines', 'st catharines', 'saint catharines', 'catharines', 'swayze falls', 'swayze', 'palaeozoic path', 'palaeozoic', 'paleozoic', 'scarlet tanager', 'halloween', 'crawford lake'],
+  rouge: ['rouge national urban park', 'rouge park', 'rouge valley', 'rouge', 'scarborough', 'twyn rivers', 'vista trail', 'mast trail', 'orchard trail', 'glen rouge', 'zoo road', 'halloween', 'crawford lake'],
 };
 
 // Phrases removed before topic detection so "Balls Falls" doesn't trigger "falls" (highlights), etc.
 const NAME_PHRASES = [
-  "ball's falls", 'balls falls', 'ball falls', 'cataract falls', 'swayze falls', 'upper falls', 'lower falls', 'hilton falls',
+  "ball's falls", 'balls falls', 'ball falls', 'cataract falls', 'upper falls', 'lower falls', 'hilton falls',
   'cataract trail', 'kettle trail', 'meadow trail', 'heritage trail', 'main loop trail', 'main loop', 'buffalo crag trail',
-  'vista adventure trail', 'scarlet tanager trail', 'palaeozoic path', 'trail centre', 'trail center', 'short hills',
-  'forks of the credit',
+  'vista adventure trail', 'vista trail', 'mast trail', 'orchard trail', 'trail centre', 'trail center',
+  'forks of the credit', 'rouge national urban park', 'twyn rivers drive', 'twyn rivers', 'zoo road', 'glen rouge',
 ];
 
-const BACKUP_NAMES = ['mono cliffs', 'hilton falls', 'mount nemo', 'mt nemo', 'rock point', 'crawford lake', 'headwaters', 'monarch'];
+const BACKUP_NAMES = ['mono cliffs', 'hilton falls', 'mount nemo', 'mt nemo', 'rock point', 'crawford lake', 'headwaters', 'monarch', 'glen rouge'];
 
 const ORDINALS = { first: 1, '1st': 1, second: 2, '2nd': 2, third: 3, '3rd': 3, fourth: 4, '4th': 4, fifth: 5, '5th': 5, last: 5, final: 5 };
 
@@ -207,6 +207,8 @@ const trailLine = (t) => {
   return `${badge(t.level)} <b>${esc(t.name)}</b>${bits ? `: ${bits}` : ''}${t.note ? `. ${esc(t.note)}` : ''}`;
 };
 const easiestTrail = (h) => h.trails.find((t) => t.level === 'EASY') || h.trails[0];
+const tickAlert = (h) => h.alerts.find((a) => a.kind === 'tick');
+const barrierFree = (h) => h.trails.find((t) => /barrier-free/i.test(t.note || ''));
 const levelText = (h) => `${badge(h.level)}${h.optionLevel ? ` with ${h.optionLevel === 'EASY' ? 'an' : 'a'} ${badge(h.optionLevel)} option` : ''}`;
 const meetLine = (h) => `${esc(h.meet.time)}${h.meet.place ? ` at ${esc(h.meet.place)}` : ''}`;
 const roadAlert = (h) => h.alerts.filter((a) => a.kind === 'road').map((a) => `<p class="ans-warn"><b>${esc(a.title)}.</b> ${esc(a.text)}</p>`).join('');
@@ -214,7 +216,7 @@ const roadAlert = (h) => h.alerts.filter((a) => a.kind === 'road').map((a) => `<
 const ANSWERS = {
   time: {
     one: (h) => `<p>Meet <b>${meetLine(h)}</b> on ${esc(h.dateShort)}.${h.meet.note ? ' ' + esc(h.meet.note) : ''}</p>`,
-    all: () => list(HIKES.map((h) => `${who(h)}: ${meetLine(h)}`)) + `<p>Short Hills on Oct 31 is the only true early start (sunrise opening).</p>`,
+    all: () => list(HIKES.map((h) => `${who(h)}: ${meetLine(h)}`)),
   },
   where: {
     one: (h) =>
@@ -273,18 +275,28 @@ const ANSWERS = {
     all: () => `<p>The plan lists picnic tables only at Forks of the Credit (Sat Oct 3).</p>`,
   },
   ticks: {
-    one: (h) =>
-      h.id === 'short-hills'
-        ? `<p><b>Tick warning.</b> Wear long pants and check yourself after.</p>`
-        : `<p>The plan's tick warning is for Short Hills (Sat Oct 31). It doesn't mention ticks at ${esc(h.park)}.</p>`,
-    all: () => `<p><b>Tick warning for Short Hills (Sat Oct 31):</b> wear long pants and check yourself after.</p>`,
+    one: (h) => {
+      const a = tickAlert(h);
+      return a ? `<p><b>${esc(a.title)}.</b> ${esc(a.text)}</p>` : `<p>The plan doesn't mention ticks at ${esc(h.park)}.</p>`;
+    },
+    all: () => {
+      const hikes = HIKES.filter(tickAlert);
+      return hikes.length
+        ? list(hikes.map((h) => `${who(h)}: ${esc(tickAlert(h).text)}`))
+        : `<p>The plan doesn't mention ticks on any of the hikes.</p>`;
+    },
   },
   access: {
-    one: (h) =>
-      h.id === 'short-hills'
-        ? `<p>The <b>Palaeozoic Path</b> is barrier-free: 0.8 km to the Swayze Falls viewpoint.</p>`
-        : notInPlan('a barrier-free trail', h),
-    all: () => `<p>The only barrier-free trail in the plan is the <b>Palaeozoic Path</b> at Short Hills (Sat Oct 31): 0.8 km to the Swayze Falls viewpoint.</p>`,
+    one: (h) => {
+      const t = barrierFree(h);
+      return t ? `<p>The <b>${esc(t.name)}</b> is barrier-free${t.length ? `: ${esc(t.length)}` : ''}.</p>` : notInPlan('a barrier-free trail', h);
+    },
+    all: () => {
+      const hikes = HIKES.filter(barrierFree);
+      return hikes.length
+        ? list(hikes.map((h) => `${who(h)}: ${esc(barrierFree(h).name)}`))
+        : `<p>The plan doesn't list a barrier-free trail on any of the hikes.</p>` + dontKnow();
+    },
   },
   emergency: { one: () => ANSWERS.emergency.all(), all: () => `<p><b>${esc(GROUP.emergency)}</b></p>` },
   kids: {
@@ -295,8 +307,7 @@ const ANSWERS = {
     },
     all: () =>
       `<p>${esc(GROUP.kids)} The easiest trail on each hike:</p>` +
-      list(HIKES.map((h) => { const t = easiestTrail(h); return `${who(h)}: ${esc(t.name)}${t.length ? ` (${esc(t.length)})` : ''}`; })) +
-      `<p>The Palaeozoic Path at Short Hills is barrier-free, so it works for strollers.</p>`,
+      list(HIKES.map((h) => { const t = easiestTrail(h); return `${who(h)}: ${esc(t.name)}${t.length ? ` (${esc(t.length)})` : ''}`; })),
   },
   parking: {
     one: (h) =>

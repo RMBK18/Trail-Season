@@ -42,9 +42,13 @@ const SELFTEST = '_selftest';
 const SELFTEST_KEEP_MS = 3600 * 1000;
 const SELFTEST_MAX = 20;
 
+// A hike replaced by another on the same date: its replies move to the new one,
+// and phones still on the old app version keep working until they update.
+const RENAMED = { 'short-hills': 'rouge' };
+
 const hikeById = new Map(HIKES.map((h) => [h.id, h]));
 const selftestHike = { id: SELFTEST, dateShort: 'Test', shortName: 'Self-test' };
-const findHike = (id) => (id === SELFTEST ? selftestHike : hikeById.get(id));
+const findHike = (id) => (id === SELFTEST ? selftestHike : hikeById.get(RENAMED[id] || id));
 const hikeOver = (h, now = Date.now()) => h.id !== SELFTEST && now > endMs(h);
 
 // ── Input cleaning ──────────────────────────────────────────
@@ -113,6 +117,12 @@ export class RsvpStore extends DurableObject {
       updated_at INTEGER NOT NULL,
       UNIQUE (hike_id, device)
     )`);
+    for (const [from, to] of Object.entries(RENAMED)) {
+      if (!hikeById.has(to)) continue;
+      // A phone that somehow replied to both keeps its newer reply.
+      this.sql.exec(`DELETE FROM rsvps WHERE hike_id = ? AND device IN (SELECT device FROM rsvps WHERE hike_id = ?)`, from, to);
+      this.sql.exec('UPDATE rsvps SET hike_id = ? WHERE hike_id = ?', to, from);
+    }
   }
 
   rows(hikeId) {
@@ -125,6 +135,7 @@ export class RsvpStore extends DurableObject {
     for (const r of this.sql.exec('SELECT * FROM rsvps WHERE hike_id != ? ORDER BY updated_at', SELFTEST)) {
       if (out[r.hike_id]) out[r.hike_id].push(publicEntry(r, deviceHash));
     }
+    for (const [from, to] of Object.entries(RENAMED)) if (out[to]) out[from] = out[to];
     return out;
   }
 
@@ -399,7 +410,7 @@ export default {
 
     const m = /^\/rsvps(?:\/([a-z0-9_-]{1,60}))?$/.exec(path);
     if (!m) return json({ error: 'Not found' }, 404, cors);
-    const hikeId = m[1] || null;
+    const hikeId = m[1] ? RENAMED[m[1]] || m[1] : null;
 
     const device = request.headers.get('X-Device') || '';
     if (!/^[A-Za-z0-9_-]{16,64}$/.test(device)) return json({ error: 'Missing or invalid X-Device header' }, 400, cors);

@@ -8,6 +8,8 @@
 // the app, and the test removes its own replies at the end.
 // ─────────────────────────────────────────────────────────────
 
+import { HIKES } from '../../js/data.js';
+
 const [url] = process.argv.slice(2);
 const ORIGIN = process.env.ORIGIN || 'https://rmbk18.github.io';
 const HIKE = '_selftest';
@@ -58,7 +60,7 @@ try {
   check('A missing phone id is rejected', (await call('GET', '/rsvps')).status === 400);
 
   const all = await call('GET', '/rsvps', { device: A });
-  check('Lists come back for all five hikes', all.status === 200 && Object.keys(all.data.hikes || {}).length === 5, Object.keys(all.data.hikes || {}).join(', '));
+  check(`Lists come back for all ${HIKES.length} hikes in the plan`, all.status === 200 && HIKES.every((h) => Array.isArray(all.data.hikes?.[h.id])), Object.keys(all.data.hikes || {}).join(', '));
   check('The test hike is hidden from the app', !(HIKE in (all.data.hikes || {})));
 
   // 2. Replying
