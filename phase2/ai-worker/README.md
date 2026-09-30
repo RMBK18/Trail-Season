@@ -133,7 +133,7 @@ it opens the app online. If it doesn't, close the app fully and open it again.
 **In a browser:** open the Worker URL. You should see:
 
 ```json
-{"ok":true,"service":"fall-hike-ai","aiConfigured":true,"alertsConfigured":true}
+{"ok":true,"service":"fall-hike-ai","aiConfigured":true,"model":"@cf/meta/llama-3.3-70b-instruct-fp8-fast","alertsConfigured":true}
 ```
 
 This doesn't call the AI. `"aiConfigured":false` means the `[ai]` binding is missing;
@@ -196,8 +196,8 @@ go to Cloudflare, counting toward the free allowance) and `node test.mjs http://
 | Worker URL shows `"aiConfigured":false` | The `[ai]` binding is missing from `wrangler.toml`, or the Worker was deployed without it. Redeploy. |
 | `403 Origin not allowed` | `ALLOWED_ORIGIN` must be exactly `https://rmbk18.github.io` (no path). curl and scripts must send an `Origin` header. |
 | `500 AI service is misconfigured` | The key is wrong, revoked or unset. Create a new key and run `secret put` again. |
-| `429 Too many questions` | The 10-per-minute limit, or Workers AI's own rate limit. Wait a minute, or raise `limit` in `wrangler.toml`. |
-| `502 AI service unavailable` | The free daily AI allowance is used up (it resets at midnight UTC), Workers AI is busy, or the model in `AI_MODEL` was retired. `npx wrangler tail` shows the error. |
+| `429 Too many questions` | The 10-per-minute limit, Workers AI's own rate limit, or the free daily AI allowance is used up (it resets at midnight UTC). Wait, or raise `limit` in `wrangler.toml` for the first case. |
+| `502 AI service unavailable` | Workers AI is busy, or the model in `AI_MODEL` was retired. `npx wrangler tail` shows the error. |
 | `504` or the app gives up | The answer took over 12 s. The app waits 15 s, then falls back to "ask Summan!". Try again. |
 | No ntfy alerts arrive | `alertsConfigured` is `false` (set the `NTFY_TOPIC` secret), or the name in the app doesn't exactly match the secret. Off-topic questions never send alerts. |
 | AI says it doesn't know something the plan covers | By design it answers only when it can quote the plan exactly. Add or reword the fact in `js/data.js` (or ask Summan to), then redeploy. |

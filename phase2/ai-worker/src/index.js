@@ -255,9 +255,12 @@ function errorResponse(err, cors, forwarded) {
   if (err instanceof AIError && err.kind === 'timeout') {
     return json({ error: 'AI took too long to answer', forwarded }, 504, cors);
   }
+  if (err instanceof AIError && /limit|allocation|neuron|quota|429/i.test(err.message)) {
+    // Free daily allowance used up (resets 00:00 UTC) or Workers AI rate limit
+    return json({ error: 'Too many questions right now. Try again later.', forwarded }, 429, { ...cors, 'Retry-After': '3600' });
+  }
   if (err instanceof AIError) {
-    // Workers AI failed twice: out of capacity, the free daily allowance used
-    // up, or a retired model name in AI_MODEL
+    // Workers AI failed twice: out of capacity, or a retired model name in AI_MODEL
     return json({ error: 'AI service unavailable', forwarded }, 502, cors);
   }
   console.error('Unexpected error:', err?.message ?? err);
@@ -274,6 +277,7 @@ export default {
         ok: true,
         service: 'fall-hike-ai',
         aiConfigured: Boolean(env.AI),
+        model: env.AI_MODEL || DEFAULT_MODEL,
         alertsConfigured: Boolean(env.NTFY_TOPIC),
       }, 200);
     }

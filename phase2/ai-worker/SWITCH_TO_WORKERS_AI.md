@@ -5,9 +5,16 @@ Hand this file to a Claude Code session on this repo:
 
 ## Goal
 
-The Ask tab's live-AI step (`phase2/ai-worker/`, Worker name `fall-hike-ai`) currently calls
-xAI's Grok, which is paid. Switch it to **Cloudflare Workers AI** so it runs on the Cloudflare
-**free plan** with no AI key and no bill. Then deploy it, test it and turn it on in the app.
+Deploy the Ask tab's live-AI Worker (`phase2/ai-worker/`, Worker name `fall-hike-ai`) on
+**Cloudflare Workers AI**, test it, and turn it on in the app. It runs on the Cloudflare
+**free plan**, with no AI key and no bill.
+
+**Status: the code switch is done** (commit c66cc2f on branch `claude/fall-hike-ai-agent-ihrg1c`).
+The Worker calls `env.AI.run()` through the `[ai]` binding, with model `AI_MODEL`
+(`@cf/meta/llama-3.3-70b-instruct-fp8-fast`). It uses JSON Mode and accepts object or string
+replies. It has the 12 s timeout and one retry. A used-up daily allowance returns 429 and
+anything else 502, and both still alert. The health check shows `aiConfigured` and `model`.
+There's no xAI code left. What's left is steps 2 to 6.
 
 Everything else stays as it is:
 - The AI may answer only from `js/data.js`, and every quote is checked against THE FACTS.
@@ -39,68 +46,21 @@ settings):
 Check only that they are set, without printing them:
 `[ -n "$CLOUDFLARE_API_TOKEN" ] && echo set`. If either is missing, stop and tell the user.
 
-Work on a branch made from the latest `main`, never directly on `main`.
+Work on branch `claude/fall-hike-ai-agent-ihrg1c`, which has the code switch: `git fetch origin
+claude/fall-hike-ai-agent-ihrg1c && git checkout claude/fall-hike-ai-agent-ihrg1c`. Never work
+directly on `main`.
 
 ## Steps
 
-### 1. Code changes in `phase2/ai-worker/`
+### 1. Check the code (already switched)
 
-**`wrangler.toml`**
-- Add the Workers AI binding:
-  ```toml
-  [ai]
-  binding = "AI"
-  ```
-- Replace `XAI_MODEL` with `AI_MODEL`. Pick a current text-generation model from
-  <https://developers.cloudflare.com/workers-ai/models/> that supports **JSON mode**
-  (`response_format`). Candidates:
-  - `@cf/meta/llama-3.3-70b-instruct-fp8-fast`: best answers, uses more of the free daily
-    allowance.
-  - `@cf/meta/llama-3.1-8b-instruct-fast`: cheapest, so the free allowance covers far more
-    questions.
+```sh
+cd phase2/ai-worker && npm install
+node --check src/index.js && npx wrangler deploy --dry-run   # expect env.AI binding and AI_MODEL
+```
 
-  Start with the 70B model. If testing shows it follows the quote rules badly or costs too
-  much, compare with the 8B one.
-- Update the comments: no `XAI_API_KEY` any more; `NTFY_TOPIC` is the only secret.
-- Keep `[[ratelimits]]`. If `wrangler deploy` says it isn't available on the free plan,
-  remove it (the code already skips the limit when `env.RATE_LIMITER` is missing) and tell
-  the user.
-
-**`src/index.js`**
-- Replace `callGrok()` with a call through the binding: `env.AI.run(model, { messages,
-  max_tokens, response_format })`, keeping the same system prompt and user message.
-- Workers AI's JSON mode takes the schema directly:
-  `response_format: { type: 'json_schema', json_schema: <the schema object> }`.
-  It does not take OpenAI's `{ name, strict, schema }` wrapper. Check this against the current
-  Workers AI JSON-mode docs.
-- The result is `{ response: ... }`, not `choices[0].message.content`. `response` can be an
-  already-parsed object or a JSON string; handle both. Anything unreadable becomes
-  `unanswered`, same as now.
-- Keep the 12 s timeout, for example by racing `env.AI.run` against a timer, so the app (15 s)
-  never waits longer.
-- Map errors to the existing responses:
-  - The free daily allowance running out (the error mentions the neuron allocation or daily
-    limit) and rate-limit errors → 429 "Too many questions right now".
-  - Anything else → 502 "AI service unavailable".
-
-  Always still call `alertOrganizer()`, as the current catch block does.
-- Remove the `XAI_API_KEY` check and `XAI_URL`. Instead, if `env.AI` is missing, return the
-  "misconfigured" 500 and alert the organizer.
-- Health check (`GET`): replace `apiKeyConfigured` with `aiConfigured: Boolean(env.AI)`, and
-  add `model`.
-- Update the header comment ("Grok (xAI)" → "Workers AI").
-
-**`test.mjs`**: change the key check to `health.aiConfigured === true`, and remove the
-"costs xAI credits" wording.
-
-**`package.json`**: update `description`.
-
-**`README.md`**: rewrite for Workers AI. Cover: no AI key needed, free plan, 10,000 free
-neurons a day (resets 00:00 UTC), what happens when it runs out (the app shows "ask Summan"
-and the organizer gets the alert, with no charge), how to change `AI_MODEL`, and the new
-deploy steps. Remove the xAI setup.
-
-Run a quick syntax check (`node --check src/index.js`) and `npx wrangler deploy --dry-run`.
+If `[[ratelimits]]` turns out not to be available on the free plan when you deploy, remove it
+(the code already skips the limit when `env.RATE_LIMITER` is missing) and tell the user.
 
 ### 2. Deploy
 
@@ -136,7 +96,6 @@ the quote check is probably rejecting everything: look at the raw model output i
 
 - `js/config.js`: set `aiEndpoint` to the Worker URL.
 - `sw.js`: raise the number at the end of `VERSION` by one (check its current value first).
-- Update the top-level `README.md` wherever it describes Phase 2 AI as Grok/xAI.
 
 ### 5. Commit, push, pull request
 
