@@ -11,16 +11,21 @@ compatibility_date = "2026-09-01"
 # Origins have no path: NOT https://rmbk18.github.io/Trail-Season/
 ALLOWED_ORIGIN = "https://rmbk18.github.io"
 
-# The xAI model to use. Change it here if xAI retires it (see docs.x.ai).
-XAI_MODEL = "grok-4.3"
+# The Workers AI model to use (must support JSON Mode). Change it here if
+# Cloudflare retires it.
+AI_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
 
-# XAI_API_KEY and NTFY_TOPIC are secrets, so they are NOT set here. Add them in
-# the Cloudflare dashboard (Worker → Settings → Variables and Secrets) or with:
-#   npx wrangler secret put XAI_API_KEY
+# NTFY_TOPIC is a secret, so it is NOT set here. Add it in the Cloudflare
+# dashboard (Worker → Settings → Variables and Secrets) or with:
 #   npx wrangler secret put NTFY_TOPIC
 
+# Cloudflare Workers AI: runs the model inside Cloudflare, no API key needed.
+# The free plan includes a daily allowance (10,000 Neurons, about 125 questions).
+[ai]
+binding = "AI"
+
 # Per-visitor rate limit: 10 questions per minute per IP address.
-# Protects your xAI credits if someone finds the URL.
+# Protects your free daily AI allowance if someone finds the URL.
 [[ratelimits]]
 name = "RATE_LIMITER"
 namespace_id = "1001"

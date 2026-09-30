@@ -8,7 +8,7 @@ export const CONFIG = {
   // PHASE 2: LIVE AI ANSWERS
   // URL of YOUR server-side proxy (see README → "Phase 2: live AI answers"),
   // e.g. 'https://fall-hike-ai.<your-subdomain>.workers.dev' (phase2/ai-worker/).
-  // The proxy holds the AI (xAI Grok) API key. This app only ever sends it a question.
+  // The proxy runs the AI (Cloudflare Workers AI). This app only ever sends it a question.
   // After changing this, bump VERSION in /sw.js or installed phones keep the old value.
   // null = off: unmatched questions get "I don't know that one — ask Summan!"
   aiEndpoint: null,

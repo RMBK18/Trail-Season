@@ -2,7 +2,7 @@
   "name": "fall-hike-ai",
   "version": "1.0.0",
   "private": true,
-  "description": "Cloudflare Worker that answers Fall Hike App questions with Grok (xAI)",
+  "description": "Cloudflare Worker that answers Fall Hike App questions with Cloudflare Workers AI",
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",

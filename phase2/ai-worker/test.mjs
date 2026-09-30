@@ -5,7 +5,7 @@
 //   node test.mjs http://localhost:8787                 (after `npx wrangler dev`)
 //   node test.mjs <url> "Are there bears at Short Hills?"   (your own question)
 //
-// Each example question costs a fraction of a cent of your xAI credits.
+// Each example question uses a little of Cloudflare's free daily AI allowance.
 // ─────────────────────────────────────────────────────────────
 
 const [url, ...custom] = process.argv.slice(2);
@@ -50,8 +50,8 @@ try {
   const health = await fetch(url).then((r) => r.json());
   check('Worker is live', health.ok === true);
   if (!health.alertsConfigured) console.log('NOTE  NTFY_TOPIC is not set, so unanswered questions send no alert');
-  check('XAI_API_KEY secret is set', health.apiKeyConfigured === true,
-    health.apiKeyConfigured ? '' : 'add the XAI_API_KEY secret in the Worker settings');
+  check('Workers AI is connected', health.aiConfigured === true,
+    health.aiConfigured ? '' : 'check the [ai] binding in wrangler.toml and redeploy');
 
   // 2. CORS preflight from the app's origin
   const pre = await fetch(url, {

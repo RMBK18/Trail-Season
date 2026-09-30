@@ -409,7 +409,7 @@ function answerFromPlan(raw, now) {
 // always returns null and the user sees DONT_KNOW.
 //
 // CONFIG.aiEndpoint must point at YOUR server (the Cloudflare Worker in /phase2/ai-worker/).
-// That server holds the AI API key (XAI_API_KEY), answers only from the hike plan, and
+// That server runs Cloudflare Workers AI, answers only from the hike plan, and
 // returns { status: 'answered', answer } or { status: 'unanswered' | 'off_topic',
 // forwarded } (forwarded = the organizer got an alert).
 // Never call an AI API from this file and never put a key here.
