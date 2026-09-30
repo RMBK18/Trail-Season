@@ -177,10 +177,10 @@ curl -X POST https://fall-hike-ai.<your-subdomain>.workers.dev \
 | Question | Expected |
 |---|---|
 | What time do we meet on Oct 3? | Offline FAQ answer, no AI call |
-| Is Short Hills good for kids? | Offline FAQ answer, no AI call |
+| Is Rouge Park good for kids? | Offline FAQ answer, no AI call |
 | I'm lost on the trail | Offline emergency answer: call 911 |
 | I have bad knees, which hike should I pick? | AI answer from the plan with a "Live answer" label |
-| Are there bears at Short Hills? | Not in the plan: "I've passed it on to Summan" + **Send to Summan**, and you get an alert |
+| Are there bears at Rouge Park? | Not in the plan: "I've passed it on to Summan" + **Send to Summan**, and you get an alert |
 | Write me a poem about cats | "I can only help with the fall hikes." (no alert) |
 
 **Local testing** (optional): after `npx wrangler login`, run `npx wrangler dev` (Workers AI calls

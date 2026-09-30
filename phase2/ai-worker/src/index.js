@@ -50,8 +50,11 @@ function hikeFacts(h) {
     h.food && `- Food nearby: ${h.food}`,
     ...h.alerts.map((a) => `- Alert: ${a.title}. ${a.text}`),
     `- Bring: ${h.bring.join('; ')}`,
-    `- Backup park: ${h.backup.name}`,
-    h.fallbackTrailheads && `- Fallback trailheads: ${h.fallbackTrailheads.join(', ')}`,
+    // Backups in the order to try them, each on its own line so the AI can't mix them up
+    h.fallbackTrailheads && `- If the park is too busy, first try these fallback trailheads in the same park: ${h.fallbackTrailheads.join(', ')}`,
+    `- Backup park${h.backup.then ? ' (first choice)' : ''}: ${h.backup.name}`,
+    h.backup.note && `- About ${h.backup.name}: ${h.backup.note}${h.backup.booking ? ` Book at ${h.backup.booking.url}` : ''}`,
+    h.backup.then && `- Second backup park, only if ${h.backup.name} is sold out or can't be used: ${h.backup.then.name}`,
   ].filter(Boolean).join('\n');
 }
 

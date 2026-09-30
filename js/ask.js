@@ -17,7 +17,7 @@ export const SUGGESTIONS = [
   'What time do we meet on Oct 3?',
   'How much is Balls Falls?',
   'Can I bring my dog?',
-  'Washrooms at Short Hills?',
+  'Parking at Rouge Park?',
   'How hard is Rattlesnake Point?',
   'What should I bring?',
   'How long is the drive to Dundas?',
@@ -45,21 +45,21 @@ function hasKw(q, kw) {
 // ── Which hike is the question about? ───────────────────────
 const ALIASES = {
   'forks-of-the-credit': ['forks of the credit', 'forks', 'credit', 'caledon', 'kettle lake', 'kettle trail', 'kettle', 'meadow trail', 'cataract falls', 'mono cliffs'],
-  'dundas-valley': ['dundas valley', 'dundas', 'hermitage ruins', 'hermitage', 'main loop', 'heritage trail', 'trail centre', 'trail center', 'thanksgiving', 'headwaters', 'monarch', 'hilton falls'],
+  'dundas-valley': ['dundas valley', 'dundas peak', 'tew falls', "tew's falls", 'tews falls', 'spencer gorge', 'dundas', 'hermitage ruins', 'hermitage', 'main loop', 'heritage trail', 'trail centre', 'trail center', 'thanksgiving', 'headwaters', 'monarch', 'hilton falls'],
   'rattlesnake-point': ['rattlesnake point', 'rattlesnake', 'buffalo crag', 'nassagaweya', 'vista adventure', 'appleby line', 'appleby', 'milton', 'mount nemo', 'mt nemo'],
   'balls-falls': ['balls falls', "ball's falls", 'ball falls', 'balls', 'jordan', 'niagara', 'glen elgin', 'cataract trail', 'upper falls', 'lower falls', 'rock point'],
-  'short-hills': ['short hills', 'shorthills', 'short hill', 'st. catharines', 'st catharines', 'saint catharines', 'catharines', 'swayze falls', 'swayze', 'palaeozoic path', 'palaeozoic', 'paleozoic', 'scarlet tanager', 'halloween', 'crawford lake'],
+  rouge: ['rouge national urban park', 'rouge park', 'rouge valley', 'rouge', 'scarborough', 'twyn rivers', 'vista trail', 'mast trail', 'orchard trail', 'glen rouge', 'zoo road', 'halloween', 'crawford lake'],
 };
 
 // Phrases removed before topic detection so "Balls Falls" doesn't trigger "falls" (highlights), etc.
 const NAME_PHRASES = [
-  "ball's falls", 'balls falls', 'ball falls', 'cataract falls', 'swayze falls', 'upper falls', 'lower falls', 'hilton falls',
+  "ball's falls", 'balls falls', 'ball falls', 'cataract falls', 'upper falls', 'lower falls', 'hilton falls', 'dundas peak', "tew's falls", 'tews falls', 'tew falls', 'spencer gorge',
   'cataract trail', 'kettle trail', 'meadow trail', 'heritage trail', 'main loop trail', 'main loop', 'buffalo crag trail',
-  'vista adventure trail', 'scarlet tanager trail', 'palaeozoic path', 'trail centre', 'trail center', 'short hills',
-  'forks of the credit',
+  'vista adventure trail', 'vista trail', 'mast trail', 'orchard trail', 'trail centre', 'trail center',
+  'forks of the credit', 'rouge national urban park', 'twyn rivers drive', 'twyn rivers', 'zoo road', 'glen rouge',
 ];
 
-const BACKUP_NAMES = ['mono cliffs', 'hilton falls', 'mount nemo', 'mt nemo', 'rock point', 'crawford lake', 'headwaters', 'monarch'];
+const BACKUP_NAMES = ['mono cliffs', 'hilton falls', 'mount nemo', 'mt nemo', 'rock point', 'crawford lake', 'headwaters', 'monarch', 'glen rouge', 'dundas peak', 'tew falls', "tew's falls", 'tews falls', 'spencer gorge'];
 
 const ORDINALS = { first: 1, '1st': 1, second: 2, '2nd': 2, third: 3, '3rd': 3, fourth: 4, '4th': 4, fifth: 5, '5th': 5, last: 5, final: 5 };
 
@@ -135,7 +135,7 @@ const TOPICS = [
   { id: 'trails', kws: ['trail', 'trails', 'km', 'distance', '~how long', 'loop', 'length', 'kilometres', 'kilometers', 'miles', 'route', 'routes'] },
   { id: 'highlights', kws: ['~see', 'view', 'views', 'highlight', 'highlights', 'beautiful', 'pretty', 'scenic', 'scenery', 'waterfall', 'waterfalls', 'falls', 'special', 'colours', 'colors', 'colour', 'color', 'leaves', 'foliage', 'photo', 'photos', 'pictures', 'lookout', 'worth it'] },
   { id: 'bring', kws: ['~bring', 'pack', 'packing', 'wear', 'wearing', 'clothes', 'clothing', 'gear', 'checklist', 'shoes', 'boots', 'pants', 'prepare', 'prep', 'what do i need', 'what should i need'] },
-  { id: 'backup', kws: ['backup', 'back up', 'back-up', 'plan b', 'alternative', 'alternatives', 'alternate', 'fallback', 'fall back', 'instead', 'crowd', 'crowds', 'crowded', 'busy', 'full'] },
+  { id: 'backup', kws: ['backup', 'backups', 'back up', 'back ups', 'back-up', 'plan b', 'alternative', 'alternatives', 'alternate', 'fallback', 'fall back', 'instead', 'crowd', 'crowds', 'crowded', 'busy', 'full'] },
   { id: 'food', kws: ['food', 'restaurant', 'restaurants', 'coffee', 'cafe', 'cafes', 'eat', 'eating', 'lunch', 'breakfast', 'brunch', 'dinner', 'snack bar', 'tim hortons', 'tims', 'starbucks', 'hungry', 'grab a bite', 'bite to eat'] },
   { id: 'swim', kws: ['swim', 'swimming', 'swimsuit', 'bathing suit', 'beach', 'beaches', 'wade', 'wading'] },
   { id: 'bikes', kws: ['bike', 'bikes', 'biking', 'bicycle', 'bicycles', 'cycling', 'cyclist', 'mountain bike', 'mountain biking', 'mtb', 'ebike', 'e-bike', 'scooter'] },
@@ -207,6 +207,8 @@ const trailLine = (t) => {
   return `${badge(t.level)} <b>${esc(t.name)}</b>${bits ? `: ${bits}` : ''}${t.note ? `. ${esc(t.note)}` : ''}`;
 };
 const easiestTrail = (h) => h.trails.find((t) => t.level === 'EASY') || h.trails[0];
+const tickAlert = (h) => h.alerts.find((a) => a.kind === 'tick');
+const barrierFree = (h) => h.trails.find((t) => /barrier-free/i.test(t.note || ''));
 const levelText = (h) => `${badge(h.level)}${h.optionLevel ? ` with ${h.optionLevel === 'EASY' ? 'an' : 'a'} ${badge(h.optionLevel)} option` : ''}`;
 const meetLine = (h) => `${esc(h.meet.time)}${h.meet.place ? ` at ${esc(h.meet.place)}` : ''}`;
 const roadAlert = (h) => h.alerts.filter((a) => a.kind === 'road').map((a) => `<p class="ans-warn"><b>${esc(a.title)}.</b> ${esc(a.text)}</p>`).join('');
@@ -214,7 +216,7 @@ const roadAlert = (h) => h.alerts.filter((a) => a.kind === 'road').map((a) => `<
 const ANSWERS = {
   time: {
     one: (h) => `<p>Meet <b>${meetLine(h)}</b> on ${esc(h.dateShort)}.${h.meet.note ? ' ' + esc(h.meet.note) : ''}</p>`,
-    all: () => list(HIKES.map((h) => `${who(h)}: ${meetLine(h)}`)) + `<p>Short Hills on Oct 31 is the only true early start (sunrise opening).</p>`,
+    all: () => list(HIKES.map((h) => `${who(h)}: ${meetLine(h)}`)),
   },
   where: {
     one: (h) =>
@@ -264,27 +266,40 @@ const ANSWERS = {
   backup: {
     one: (h) =>
       `<p>Backup: <b>${esc(h.backup.name)}</b>.</p>` +
+      (h.backup.note ? `<p>${esc(h.backup.note)}</p>` : '') +
+      (h.backup.booking ? ext(h.backup.booking.url, h.backup.booking.label) : '') +
       (h.alerts.find((a) => a.kind === 'crowd') ? `<p>${esc(h.alerts.find((a) => a.kind === 'crowd').title)}. ${esc(h.alerts.find((a) => a.kind === 'crowd').text)}</p>` : '') +
-      ext(mapsUrl(h.backup.maps), `Directions to ${h.backup.name}`),
-    all: () => list(HIKES.map((h) => `${who(h)}: ${esc(h.backup.name)}`)),
+      ext(mapsUrl(h.backup.maps), `Directions to ${h.backup.name}`) +
+      (h.backup.then ? `<p>Second backup: <b>${esc(h.backup.then.name)}</b>.</p>` + ext(mapsUrl(h.backup.then.maps), `Directions to ${h.backup.then.name}`) : ''),
+    all: () => list(HIKES.map((h) => `${who(h)}: ${esc(h.backup.name)}${h.backup.then ? `, then ${esc(h.backup.then.name)}` : ''}`)),
   },
   picnic: {
     one: (h) => (h.picnic ? `<p>Yes, ${esc(h.park)} has ${esc(h.picnic.toLowerCase())}.</p>` : notInPlan('picnic tables', h)),
     all: () => `<p>The plan lists picnic tables only at Forks of the Credit (Sat Oct 3).</p>`,
   },
   ticks: {
-    one: (h) =>
-      h.id === 'short-hills'
-        ? `<p><b>Tick warning.</b> Wear long pants and check yourself after.</p>`
-        : `<p>The plan's tick warning is for Short Hills (Sat Oct 31). It doesn't mention ticks at ${esc(h.park)}.</p>`,
-    all: () => `<p><b>Tick warning for Short Hills (Sat Oct 31):</b> wear long pants and check yourself after.</p>`,
+    one: (h) => {
+      const a = tickAlert(h);
+      return a ? `<p><b>${esc(a.title)}.</b> ${esc(a.text)}</p>` : `<p>The plan doesn't mention ticks at ${esc(h.park)}.</p>`;
+    },
+    all: () => {
+      const hikes = HIKES.filter(tickAlert);
+      return hikes.length
+        ? list(hikes.map((h) => `${who(h)}: ${esc(tickAlert(h).text)}`))
+        : `<p>The plan doesn't mention ticks on any of the hikes.</p>`;
+    },
   },
   access: {
-    one: (h) =>
-      h.id === 'short-hills'
-        ? `<p>The <b>Palaeozoic Path</b> is barrier-free: 0.8 km to the Swayze Falls viewpoint.</p>`
-        : notInPlan('a barrier-free trail', h),
-    all: () => `<p>The only barrier-free trail in the plan is the <b>Palaeozoic Path</b> at Short Hills (Sat Oct 31): 0.8 km to the Swayze Falls viewpoint.</p>`,
+    one: (h) => {
+      const t = barrierFree(h);
+      return t ? `<p>The <b>${esc(t.name)}</b> is barrier-free${t.length ? `: ${esc(t.length)}` : ''}.</p>` : notInPlan('a barrier-free trail', h);
+    },
+    all: () => {
+      const hikes = HIKES.filter(barrierFree);
+      return hikes.length
+        ? list(hikes.map((h) => `${who(h)}: ${esc(barrierFree(h).name)}`))
+        : `<p>The plan doesn't list a barrier-free trail on any of the hikes.</p>` + dontKnow();
+    },
   },
   emergency: { one: () => ANSWERS.emergency.all(), all: () => `<p><b>${esc(GROUP.emergency)}</b></p>` },
   kids: {
@@ -295,8 +310,7 @@ const ANSWERS = {
     },
     all: () =>
       `<p>${esc(GROUP.kids)} The easiest trail on each hike:</p>` +
-      list(HIKES.map((h) => { const t = easiestTrail(h); return `${who(h)}: ${esc(t.name)}${t.length ? ` (${esc(t.length)})` : ''}`; })) +
-      `<p>The Palaeozoic Path at Short Hills is barrier-free, so it works for strollers.</p>`,
+      list(HIKES.map((h) => { const t = easiestTrail(h); return `${who(h)}: ${esc(t.name)}${t.length ? ` (${esc(t.length)})` : ''}`; })),
   },
   parking: {
     one: (h) =>
@@ -389,8 +403,12 @@ function answerFromPlan(raw, now) {
     };
   }
 
-  // Naming a backup park or fallback trailhead on its own means "tell me about the backup".
-  if (!strong.length && hikes.length && BACKUP_NAMES.some((n) => hasKw(q, n))) strong.push('backup');
+  // Naming a backup park or fallback trailhead on its own means "tell me about the backup",
+  // and so does asking about its fees or booking ("do we need to book Dundas Peak?").
+  if (hikes.length && BACKUP_NAMES.some((n) => hasKw(q, n))) {
+    if (!strong.length) strong.push('backup');
+    else if (strong.includes('fees') && !strong.includes('backup')) strong.splice(strong.indexOf('fees'), 1, 'backup');
+  }
 
   if (!strong.length) {
     if (hikes.length) return { matched: true, html: hikes.slice(0, 2).map(overview).join('<hr>') };

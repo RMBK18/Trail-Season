@@ -12,7 +12,7 @@ const COORDS = {
   'dundas-valley': { lat: 43.2817, lng: -80.3940, name: 'Dundas Valley' },
   'rattlesnake-point': { lat: 43.4731, lng: -79.7858, name: 'Rattlesnake Point' },
   'balls-falls': { lat: 43.1978, lng: -79.4458, name: 'Balls Falls' },
-  'short-hills': { lat: 43.1764, lng: -79.2503, name: 'Short Hills' },
+  rouge: { lat: 43.81, lng: -79.16, name: 'Rouge Park (Twyn Rivers)' },
 };
 
 const CACHE_HOURS = 6;
