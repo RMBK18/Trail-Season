@@ -114,6 +114,7 @@ function seasonText() {
 // HIKES TAB
 // ═════════════════════════════════════════════════════════════
 let homeKey = '';
+let homeShown = false; // cards rise in once, on first open
 
 function homeStateKey(now) {
   const nx = nextHike(now);
@@ -131,8 +132,9 @@ function cardHTML(h, now, nx) {
   <li class="stop stop-${st}${isNext ? ' stop-next' : ''}">
     <span class="blaze blaze-${h.level.toLowerCase()}" aria-hidden="true"></span>
     <a class="card${h.photo ? ' has-photo' : ''}" href="#/hike/${h.id}" data-push>
-      ${h.photo ? `<img class="card-photo" src="${esc(h.photo.src)}" alt="" loading="lazy" decoding="async">` : ''}
-      <span class="card-top"><span class="card-date">${esc(h.dateShort)}</span>${chip}</span>
+      ${h.photo
+        ? `<span class="card-media"><img class="card-photo" src="${esc(h.photo.src)}" alt="" loading="lazy" decoding="async"><span class="card-date">${esc(h.dateShort)}</span>${chip}</span>`
+        : `<span class="card-top"><span class="card-date">${esc(h.dateShort)}</span>${chip}</span>`}
       <h3 class="card-park">${esc(h.park)}</h3>
       <span class="card-area">${esc(h.area)}</span>
       <span class="card-badges">${levelBadges(h)}${kidsTag(h)}</span>
@@ -178,6 +180,19 @@ function signHTML(now, allHikes = getHikes()) {
   </a>`;
 }
 
+// "Five weekends. Five shades of fall." → the second sentence in italics
+function taglineHTML(text) {
+  const m = /^(.+?[.!?])\s+(.+)$/.exec(text);
+  return m ? `${esc(m[1])} <em>${esc(m[2])}</em>` : esc(text);
+}
+
+// "Oct 3 – Oct 31" from the first and last hike
+function dateSpan(hikes) {
+  if (!hikes.length) return '';
+  const d = (h) => h.dateShort.replace(/^[A-Za-z]{3}\s+/, '');
+  return hikes.length > 1 ? `${d(hikes[0])} – ${d(hikes[hikes.length - 1])}` : d(hikes[0]);
+}
+
 function renderHome() {
   const now = new Date();
   const allHikes = getHikes();
@@ -187,20 +202,25 @@ function renderHome() {
   $('#view-hikes').innerHTML = `
     <header class="canopy${APP.photo ? ' has-photo' : ''}">
       ${APP.photo ? `<img class="canopy-photo" src="${esc(APP.photo.src)}" alt="" decoding="async">` : ''}
-      <button id="admin-btn" style="position:absolute;top:calc(var(--safe-t) + 12px);right:14px;width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.3);color:#fff;font-size:20px;cursor:pointer;" title="Edit hikes">⚙️</button>
+      <button id="admin-btn" class="glass-btn" type="button" title="Edit hikes" aria-label="Edit hikes">${I.sliders}</button>
       <p class="canopy-eyebrow">${esc(APP.name)}</p>
-      <h1 class="large-title">${esc(APP.tagline || APP.name)}</h1>
+      <h1 class="large-title">${taglineHTML(APP.tagline || APP.name)}</h1>
       <p class="canopy-sub">${esc(APP.intro || 'Five Saturdays near Toronto, Oct 3 to Oct 31')}</p>
       ${APP.chips ? `<div class="glass-chips">${APP.chips.map((c) => `<span class="glass-chip">${esc(c)}</span>`).join('')}</div>` : ''}
       ${signHTML(now, allHikes)}
     </header>
     <section class="list-wrap" aria-labelledby="list-h">
       ${showGetApp ? `<button class="get-app" type="button" data-open-install>${I.download}<span><b>Add to your home screen</b><span>Opens full screen and works without signal</span></span>${I.chevR}</button>` : ''}
-      <h2 id="list-h" class="section-h">${getHikes().length === 5 ? 'The five Saturdays' : 'Upcoming Hikes'}</h2>
-      <ol class="trail">${allHikes.map((h) => cardHTML(h, now, nx)).join('')}</ol>
+      <p class="section-eyebrow">${esc(dateSpan(allHikes))}</p>
+      <h2 id="list-h" class="section-h">${allHikes.length === 5 ? 'The five Saturdays' : 'Upcoming Hikes'}</h2>
+      <ol class="trail${homeShown ? '' : ' rise'}">${allHikes.map((h) => cardHTML(h, now, nx)).join('')}</ol>
       <p class="list-foot">Tap a hike for trails, fees, directions and what to bring.</p>
       ${APP.photo ? `<p class="photo-credit">${photoCredit(APP.photo, 'Top photo')}. Park photos are credited on each hike page.</p>` : ''}
     </section>`;
+  if (!homeShown) {
+    homeShown = true;
+    setTimeout(() => $('#view-hikes .trail')?.classList.remove('rise'), 1200);
+  }
   tickSign();
 }
 
@@ -333,15 +353,21 @@ function replyText(h, name, status) {
 async function loadWeather(h) {
   const w = await getWeather(h.id);
   const box = $('#view-detail [data-weather]');
-  if (!w || !box) return;
+  if (!box || $('#view-detail').dataset.hike !== h.id) return;
+  if (!w) {
+    // Too far ahead for the forecast, or no signal
+    box.innerHTML = `<p class="weather-none">${I.clock}<span>No forecast yet. It shows up here about a week before the hike, when you have signal.</span></p>`;
+    return;
+  }
   const { desc, icon } = describeWeather(w.code);
-  const rain = w.rain > 0 ? ` ${w.rain.toFixed(1)}mm rain` : '';
+  const rain = w.rain > 0 ? ` · ${w.rain.toFixed(1)} mm rain` : '';
   box.innerHTML = `
     <div class="weather">
-      <span class="weather-icon">${icon}</span>
-      <div>
-        <b>${desc}</b><br>
-        ${w.low.toFixed(0)}–${w.high.toFixed(0)}°C${rain}
+      <span class="weather-icon" aria-hidden="true">${icon}</span>
+      <div class="weather-text">
+        <span class="weather-k">Forecast for ${esc(h.dateShort)}</span>
+        <b>${esc(desc)}</b>
+        <span>${w.low.toFixed(0)}–${w.high.toFixed(0)}°C${rain}</span>
       </div>
     </div>`;
 }
@@ -365,7 +391,7 @@ function renderDetail(h) {
   if (!document.hidden) loadWeather(h);
 
   v.innerHTML = `
-    <div class="navbar">
+    <div class="navbar${h.photo && 'IntersectionObserver' in window ? ' clear' : ''}">
       <button class="nav-back" type="button" data-back>${I.chevL}<span>Hikes</span></button>
       <span class="nav-title">${esc(h.shortName)}</span>
       <button class="nav-action" type="button" data-copy-hike="${h.id}" aria-label="Copy invite">${I.share}</button>
@@ -456,8 +482,12 @@ function renderDetail(h) {
   // Show the park name in the nav bar once the big title scrolls away
   const title = $('.hero-title', v);
   const navTitle = $('.nav-title', v);
+  const navbar = $('.navbar', v);
   if ('IntersectionObserver' in window) {
-    new IntersectionObserver(([e]) => navTitle.classList.toggle('show', !e.isIntersecting), {
+    new IntersectionObserver(([e]) => {
+      navTitle.classList.toggle('show', !e.isIntersecting);
+      if (h.photo) navbar.classList.toggle('clear', e.isIntersecting);
+    }, {
       root: v,
       rootMargin: '-60px 0px 0px 0px',
     }).observe(title);
@@ -467,13 +497,26 @@ function renderDetail(h) {
 // ═════════════════════════════════════════════════════════════
 // ASK TAB
 // ═════════════════════════════════════════════════════════════
+// Ask and Share headers: a photo band like the home screen
+function barHTML(title, photo) {
+  return `<header class="bar${photo ? ' has-photo' : ''}">
+    ${photo ? `<img class="bar-photo" src="${esc(photo.src)}" alt="" decoding="async">` : ''}
+    <p class="bar-eyebrow">${esc(APP.name)}</p>
+    <h1 class="bar-title">${esc(title)}</h1>
+  </header>`;
+}
+
 function renderAsk() {
   $('#view-ask').innerHTML = `
-    <header class="bar"><h1 class="bar-title">Ask</h1></header>
+    ${barHTML('Ask', APP.photo)}
     <div class="chat" id="chat" aria-live="polite">
-      <div class="msg bot">
+      <div class="welcome">
+        <span class="welcome-icon" aria-hidden="true">${I.leaf}</span>
+        <h2 class="welcome-h">Questions about the hikes?</h2>
         <p>Ask about meeting times, fees and booking, dogs, difficulty, drive times, washrooms or what to bring.</p>
         <p class="msg-fine">Answers come from the hike plan and work offline.</p>
+        <p class="welcome-try">Try asking</p>
+        <div class="welcome-qs">${SUGGESTIONS.slice(0, 4).map((s) => `<button class="chip-q" type="button" data-suggest="${esc(s)}">${esc(s)}</button>`).join('')}</div>
       </div>
     </div>
     <div class="chips" role="list">${SUGGESTIONS.map((s) => `<button class="chip-q" type="button" role="listitem" data-suggest="${esc(s)}">${esc(s)}</button>`).join('')}</div>
@@ -529,6 +572,7 @@ async function sendQuestion(q) {
 async function ask(question) {
   const q = question.trim();
   if (!q) return;
+  $('#view-ask').classList.add('asked'); // the suggestion row replaces the welcome list
   addMsg('me', q);
   const res = answer(q);
   if (res.matched) {
@@ -577,8 +621,9 @@ const ANDROID_STEPS = [
 const stepsHTML = (steps) => `<ol class="steps">${steps.map((s) => `<li>${s}</li>`).join('')}</ol>`;
 
 function renderShare() {
+  const photo = HIKES[0]?.photo;
   $('#view-share').innerHTML = `
-    <header class="bar"><h1 class="bar-title">Share</h1></header>
+    ${barHTML('Share', photo)}
     <div class="pad">
       <section class="block">
         <h2>Invite friends</h2>
@@ -619,6 +664,7 @@ function renderShare() {
         ${stepsHTML(ANDROID_STEPS)}
         <p class="fine">Once installed, the app opens full screen and keeps working without signal.</p>
       </section>
+      ${photo ? `<p class="photo-credit">${photoCredit(photo, 'Top photo')}</p>` : ''}
     </div>`;
 }
 

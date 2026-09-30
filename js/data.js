@@ -20,11 +20,11 @@ export const APP = {
   // Photos are from Wikimedia Commons under free licences; each is credited in the app.
   photo: {
     src: 'img/hikes/season.jpg',
-    alt: 'A hiker on a forest trail in fall',
-    author: 'Ajwm8103',
-    license: 'CC BY-SA 4.0',
-    licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0',
-    source: 'https://commons.wikimedia.org/wiki/File:Man_walking_through_Rattlesnake_Point.jpg',
+    alt: 'Orange and red maples under a deep blue sky at Forks of the Credit',
+    author: 'mark.watmough',
+    license: 'CC BY 2.0',
+    licenseUrl: 'https://creativecommons.org/licenses/by/2.0',
+    source: 'https://commons.wikimedia.org/wiki/File:Fall_2016_(30369753895).jpg',
   },
 };
 
@@ -105,11 +105,11 @@ export const HIKES = [
     accent: 'rust',
     photo: {
       src: 'img/hikes/forks-of-the-credit.jpg',
-      alt: 'A lake ringed with orange and red fall trees, reflecting the clouds',
-      author: 'chsyang',
-      license: 'Public domain',
-      licenseUrl: null,
-      source: 'https://commons.wikimedia.org/wiki/File:Forks_of_Credit_Provincial_Park%EF%BC%8CCanada_(53267092933).jpg',
+      alt: 'Cataract Falls framed by red, orange and gold fall trees',
+      author: 'mark.watmough',
+      license: 'CC BY 2.0',
+      licenseUrl: 'https://creativecommons.org/licenses/by/2.0',
+      source: 'https://commons.wikimedia.org/wiki/File:Fall_2016_(30369741725).jpg',
     },
   },
   {
@@ -156,11 +156,11 @@ export const HIKES = [
     accent: 'forest',
     photo: {
       src: 'img/hikes/dundas-valley.jpg',
-      alt: 'The Dundas Valley Conservation Area trail sign among fall trees',
+      alt: 'The stone Hermitage Ruins among fall trees',
       author: 'Jaydenfromcanada',
       license: 'CC BY-SA 4.0',
       licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0',
-      source: 'https://commons.wikimedia.org/wiki/File:DundasValleyPark.jpg',
+      source: 'https://commons.wikimedia.org/wiki/File:HamiltonHermitage.jpg',
     },
   },
   {
@@ -207,11 +207,11 @@ export const HIKES = [
     accent: 'amber',
     photo: {
       src: 'img/hikes/rattlesnake-point.jpg',
-      alt: 'View from the escarpment over farmland and fall trees',
-      author: 'Emily CA (MPL)',
-      license: 'CC BY-SA 4.0',
-      licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0',
-      source: 'https://commons.wikimedia.org/wiki/File:Rattlesnake_Point_Milton_Ontario.jpg',
+      alt: 'Fall colours across Nassagaweya Canyon from the escarpment edge',
+      author: 'jockrutherford',
+      license: 'CC BY-SA 2.0',
+      licenseUrl: 'https://creativecommons.org/licenses/by-sa/2.0',
+      source: 'https://commons.wikimedia.org/wiki/File:Rattlesnake_Point_(45334957511).jpg',
     },
   },
   {
@@ -313,11 +313,11 @@ export const HIKES = [
     accent: 'dawn',
     photo: {
       src: 'img/hikes/short-hills.jpg',
-      alt: 'A leaf-covered forest trail in autumn',
-      author: 'KokoHoarse',
-      license: 'CC BY-SA 4.0',
-      licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0',
-      source: 'https://commons.wikimedia.org/wiki/File:Short_Hills_Provincial_Park_-Autumn_trail.jpg',
+      alt: 'A thin waterfall over a rock ledge above mossy boulders and fallen leaves',
+      author: 'Gogerr',
+      license: 'CC BY 4.0',
+      licenseUrl: 'https://creativecommons.org/licenses/by/4.0',
+      source: 'https://commons.wikimedia.org/wiki/File:Creek_at_Short_Hills_Provincial_Park.jpg',
     },
   },
 ];
