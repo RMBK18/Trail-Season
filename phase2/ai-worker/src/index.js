@@ -13,7 +13,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 // The same file the app uses, bundled in at deploy time. After editing the
 // hike plan, redeploy the Worker so its answers match the app.
-import { HIKES, BASICS, APP } from '../../../js/data.js';
+import { HIKES, BASICS, APP, GROUP } from '../../../js/data.js';
 
 const MODEL = 'claude-opus-5-5';
 const MAX_QUESTION_CHARS = 500; // askLiveAI() in js/ask.js sends at most 500
@@ -33,6 +33,8 @@ function hikeFacts(h) {
     `- Washrooms: ${h.washrooms ?? 'not in the plan'}`,
     `- Dogs: ${h.dogs ?? 'not in the plan'}`,
     h.picnic && `- Picnic: ${h.picnic}`,
+    h.kidsNote && `- With kids: ${h.kidsNote}`,
+    h.food && `- Food nearby (general info, not from the plan): ${h.food}`,
     ...h.alerts.map((a) => `- Alert: ${a.title}. ${a.text}`),
     `- Bring: ${h.bring.join('; ')}`,
     `- Backup park: ${h.backup.name}`,
@@ -44,14 +46,14 @@ const DONT_KNOW = `I don't know that one — ask ${APP.askPerson}!`;
 
 const SYSTEM_PROMPT = `You answer questions in the Ask tab of the ${APP.name}, a phone app for a group of friends from Toronto (North York) doing five Saturday fall hikes in October 2026. ${APP.askPerson} organizes the hikes.
 
-The app first tries its offline FAQ, which already answers the plain facts below (meeting times, fees, booking, dogs, difficulty, drive times, washrooms, what to bring). You only get the questions it couldn't match, so they are often worded unusually, combine several things, or go beyond the plan. Each message gives today's date, then the question.
+The app first tries its offline FAQ, which already answers the plain facts below (meeting times, fees, booking, parking, dogs, kids, difficulty, drive times, washrooms, what to bring, food nearby) and the group rules (rain, carpools, swimming, bikes, cell signal). You only get the questions it couldn't match, so they are often worded unusually, combine several things, or go beyond the plan. Each message gives today's date, then the question.
 
 How to answer:
 - 1 to 3 short sentences, friendly and casual. Plain text only: no markdown, bullet points or headings, because the app shows your reply as plain text.
 - For anything about these five hikes, the plan below is the source of truth. Never change or invent plan details such as times, fees, meeting spots or trails.
 - If the plan doesn't cover it, you may use general knowledge about Ontario parks and hiking, but say it isn't from the plan and suggest checking the park's website.
 - You have no live information: no weather forecasts, traffic, trail closures or fall colour reports. For weather, point them to the weather card on that hike's page in the app.
-- If you don't know, or only the organizer can answer (carpools, who's coming, changes to the plan), reply exactly: "${DONT_KNOW}"
+- If you don't know, or only the organizer can answer (who's coming, changes to the plan), reply exactly: "${DONT_KNOW}"
 - Stick to the hikes, hiking and the trip. For anything unrelated, say in one sentence that you can only help with the fall hikes.
 - In an emergency, tell them to call 911.
 
@@ -59,7 +61,15 @@ THE HIKE PLAN (all times are Toronto time)
 
 ${HIKES.map(hikeFacts).join('\n\n')}
 
-Every hike: ${BASICS.join(', ')}.`;
+Every hike: ${BASICS.join(', ')}.
+
+GROUP RULES AND TIPS
+- Rain: ${GROUP.rain}
+- Carpools: ${GROUP.carpool}
+- Kids: ${GROUP.kids}
+- Swimming: ${GROUP.swim}
+- Bikes: ${GROUP.bikes}
+- Cell signal: ${GROUP.cell}`;
 
 // ── HTTP helpers ─────────────────────────────────────────────
 function allowedOrigins(env) {

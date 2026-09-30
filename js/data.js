@@ -2,6 +2,7 @@
 // Fall Hike App: the hike plan.
 // This file is the single source of truth. Every fact the app shows,
 // and every answer the Ask tab gives, comes from here.
+// (The live-AI Worker in /phase2/ai-worker/ reads it too: redeploy it after edits.)
 //
 // After editing: bump VERSION in /sw.js so installed phones pick up the change.
 // ─────────────────────────────────────────────────────────────
@@ -18,6 +19,18 @@ export const APP = {
 // These are the only strings in the app that are not from the hike plan.
 // Delete items here if you want the checklist to be plan-only.
 export const BASICS = ['Water', 'Snacks', 'Layers', 'Sturdy shoes', 'Charged phone'];
+
+// Group rules and general tips for the Ask tab's quick answers.
+// rain, carpool and kids are the organizer's rules. The rest is general
+// advice, not from the hike plan: edit freely.
+export const GROUP = {
+  rain: `We still go in light rain, so bring a rain jacket. If the weather looks bad, ${APP.askPerson} will post any change in the group chat the night before.`,
+  carpool: `Carpools are sorted in the group chat. Post there if you need a ride or have spare seats.`,
+  kids: `Kids are welcome. Let ${APP.askPerson} know so we can plan the pace.`,
+  swim: `No swimming on these hikes: none of the five parks has a swimming area, and the water is cold in October. Enjoy the falls from the trail.`,
+  bikes: `Leave the bike at home: these are group hikes. Some of these parks allow bikes only on certain trails, so check the park's website before riding there another day.`,
+  cell: `Signal is usually fine near the parking lots but can be patchy on the trails. This app works offline once it's installed. For directions with no signal, save the area in Google Maps for offline use before you leave.`,
+};
 
 export const HIKES = [
   {
@@ -59,6 +72,8 @@ export const HIKES = [
     noWashrooms: false,
     dogs: 'Leashed dogs OK',
     picnic: 'Picnic tables',
+    food: 'Belfountain village (about 5 min) or Erin (about 15 min)',
+    kidsNote: null,
     alerts: [
       { kind: 'permit', title: 'Every car needs a permit', text: 'Book an advance day-use permit at reservations.ontarioparks.com (~$18/vehicle).' },
       { kind: 'time', title: 'Gate opens at 8:00 sharp', text: 'No earlier. We meet there at 8:00 AM.' },
@@ -100,6 +115,8 @@ export const HIKES = [
     noWashrooms: false,
     dogs: 'Dogs OK',
     picnic: null,
+    food: 'Downtown Dundas (about 10 min)',
+    kidsNote: null,
     alerts: [
       { kind: 'crowd', title: 'Thanksgiving weekend: extremely busy', text: 'Fallback trailheads: Headwaters, Monarch.' },
     ],
@@ -140,6 +157,8 @@ export const HIKES = [
     noWashrooms: false,
     dogs: 'Dogs OK',
     picnic: null,
+    food: 'Milton (about 15–20 min)',
+    kidsNote: 'Keep kids close at the cliff-edge lookouts.',
     alerts: [
       { kind: 'road', title: 'Appleby Line is CLOSED for construction', text: 'Detour: Derry Rd → Bell School Line → 14 Side Road (+15 min).' },
     ],
@@ -184,6 +203,8 @@ export const HIKES = [
     noWashrooms: false,
     dogs: 'Dogs OK',
     picnic: null,
+    food: 'Jordan Village (about 5 min)',
+    kidsNote: 'Keep kids back from the edges at the falls.',
     alerts: [],
     bring: ['Pass from niagara.goingtocamp.com ($15/vehicle, recommended)'],
     maps: 'Balls Falls Conservation Area, Jordan, ON',
@@ -222,6 +243,8 @@ export const HIKES = [
     noWashrooms: true,
     dogs: null,
     picnic: null,
+    food: 'Fonthill (about 10 min)',
+    kidsNote: null,
     alerts: [
       { kind: 'time', title: 'Meet 7:30 AM', text: 'Sunrise opening, the only true early start.' },
       { kind: 'washroom', title: 'NO washrooms anywhere in the park', text: 'Stop before you arrive.' },
