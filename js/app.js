@@ -1,7 +1,10 @@
 import { HIKES, BASICS, APP, KIDS_LABELS, hikeById } from './data.js';
 import { esc, mapsUrl, meetMs, endMs, statusOf, nextHike, isHikeDay, countdownParts } from './lib.js';
 import { answer, askLiveAI, isLiveAIOn, DONT_KNOW, FORWARDED, OFF_TOPIC_REPLY, SUGGESTIONS } from './ask.js';
-import { isRsvpLive, setRsvp, subscribeRsvps, RSVP_STATUSES, RSVP_LABELS } from './rsvp.js';
+import {
+  isRsvpLive, setRsvp, removeRsvp, subscribeRsvps, refreshAll, countsFor, myReply,
+  onRsvpChange, onRsvpProblem, RSVP_STATUSES, RSVP_LABELS, MAX_GUESTS, MAX_SEATS,
+} from './rsvp.js';
 import { I } from './icons.js';
 import { getWeather, describeWeather } from './weather.js';
 import { showAdminPanel } from './editor.js';
@@ -95,8 +98,9 @@ function inviteText(h) {
     ...alerts.map((a) => `⚠️ ${a.title}. ${a.text}`),
     `🔁 Backup: ${h.backup.name}`,
     '',
-    'Are you in? Reply here.',
-    `Details: ${appUrl()}#/hike/${h.id}`,
+    ...(isRsvpLive()
+      ? ['Are you in? Tap "Coming" here:', `${appUrl()}#/hike/${h.id}/rsvp`]
+      : ['Are you in? Reply here.', `Details: ${appUrl()}#/hike/${h.id}`]),
   ].join('\n');
 }
 
@@ -141,6 +145,7 @@ function cardHTML(h, now, nx) {
       <span class="card-facts">
         <span class="fact-inline">${I.clock}Meet ${esc(h.meet.time)}</span>
         <span class="fact-inline">${I.car}${esc(h.drive.short)}</span>
+        ${isRsvpLive() ? `<span class="fact-inline going" data-going="${h.id}" hidden>${I.users}<span></span></span>` : ''}
       </span>
       <span class="card-chev">${I.chevR}</span>
     </a>
@@ -217,6 +222,7 @@ function renderHome() {
       <p class="list-foot">Tap a hike for trails, fees, directions and what to bring.</p>
       ${APP.photo ? `<p class="photo-credit">${photoCredit(APP.photo, 'Top photo')}. Park photos are credited on each hike page.</p>` : ''}
     </section>`;
+  fillGoing();
   if (!homeShown) {
     homeShown = true;
     setTimeout(() => $('#view-hikes .trail')?.classList.remove('rise'), 1200);
@@ -291,59 +297,263 @@ function checklistHTML(h) {
 }
 
 // ═════════════════════════════════════════════════════════════
-// PHASE 2: SHARED RSVP UI
-// Renders only when isRsvpLive() is true (Firestore configured in js/config.js
-// AND js/rsvp.js replaced with a real implementation). In Phase 1 the section
-// just says RSVPs aren't in the app yet. Nothing here uses localStorage for RSVPs;
-// only the friend's own display name is remembered on their phone.
+// SHARED RSVP UI ("Who's coming")
+// Live when CONFIG.rsvpEndpoint is set (js/rsvp.js talks to the RSVP Worker).
+// Otherwise the section offers "Copy my reply" for the group chat.
 // ═════════════════════════════════════════════════════════════
 let rsvpUnsub = null;
 
+const stepperHTML = (key, label, hint, value, min, max) => `
+  <div class="stepper-row" data-row="${key}">
+    <span class="stepper-label">${label}${hint ? `<small>${hint}</small>` : ''}</span>
+    <span class="stepper" data-stepper="${key}" data-min="${min}" data-max="${max}">
+      <button type="button" data-step="-1" aria-label="${label}: one less">−</button>
+      <output aria-live="polite">${value}</output>
+      <button type="button" data-step="1" aria-label="${label}: one more">+</button>
+    </span>
+  </div>`;
+
+const SEG_LABELS = { coming: 'Coming', maybe: 'Maybe', cant: "Can't go" };
+
+function rsvpFormHTML(h) {
+  const mine = myReply(h.id);
+  const status = mine?.status || 'coming';
+  const carpool = mine?.carpool || '';
+  const seg = (attr, value, label, on) => `<button type="button" class="seg-btn" ${attr}="${value}" aria-pressed="${on}">${label}</button>`;
+  return `
+    <form class="rsvp-form" data-rsvp-form="${h.id}" data-dirty="false" novalidate>
+      <label class="rsvp-name"><span>Your name</span><input type="text" maxlength="40" autocomplete="given-name" enterkeyhint="done" data-rsvp-name value="${esc(mine?.name || store.get('fh:name', ''))}"></label>
+      <div class="seg" role="group" aria-label="Your answer">
+        ${RSVP_STATUSES.map((st) => seg('data-rsvp-pick', st, esc(SEG_LABELS[st]), st === status)).join('')}
+      </div>
+      <div class="rsvp-extras" data-rsvp-extras ${status === 'cant' ? 'hidden' : ''}>
+        ${stepperHTML('guests', 'People with you', 'Friends or kids', mine?.guests || 0, 0, MAX_GUESTS)}
+        <div class="carpool-row">
+          <span class="stepper-label">Carpool</span>
+          <div class="seg seg-sm" role="group" aria-label="Carpool">
+            ${seg('data-rsvp-carpool', '', 'Sorted', carpool === '')}
+            ${seg('data-rsvp-carpool', 'driving', 'I can drive', carpool === 'driving')}
+            ${seg('data-rsvp-carpool', 'need-ride', 'Need a ride', carpool === 'need-ride')}
+          </div>
+        </div>
+        <div data-seats ${carpool === 'driving' ? '' : 'hidden'}>${stepperHTML('seats', 'Spare seats', '', mine?.seats || 3, 1, MAX_SEATS)}</div>
+      </div>
+      <div class="rsvp-claim" data-rsvp-claim hidden></div>
+      <button class="btn btn-primary" type="submit" data-rsvp-send>${mine ? 'Update my reply' : 'Send my reply'}</button>
+      <button class="btn btn-text" type="button" data-rsvp-remove ${mine ? '' : 'hidden'}>Remove my reply</button>
+      <p class="fine">Everyone with the app sees your name. Replies are deleted a week after the hike.</p>
+    </form>`;
+}
+
 function rsvpSectionHTML(h) {
   if (isRsvpLive()) {
+    const over = statusOf(h) === 'done';
     return `<div class="rsvp" data-rsvp="${h.id}">
-      <label class="rsvp-name"><span>Your name</span><input type="text" maxlength="40" autocomplete="given-name" data-rsvp-name value="${esc(store.get('fh:name', ''))}"></label>
-      <div class="rsvp-buttons">${RSVP_STATUSES.map((s) => `<button class="btn btn-choice" type="button" data-rsvp-status="${s}">${esc(RSVP_LABELS[s])}</button>`).join('')}</div>
-      <div class="rsvp-list" aria-live="polite"><p class="muted">Loading who's coming…</p></div>
+      <p class="rsvp-tally" data-rsvp-tally></p>
+      ${over ? '<p class="muted">This hike is over, so replies are closed.</p>' : rsvpFormHTML(h)}
+      <div class="rsvp-list" aria-live="polite"></div>
     </div>`;
   }
- return `<div class="rsvp-reply" data-reply="${h.id}">
+  return `<div class="rsvp-reply" data-reply="${h.id}">
     <p>RSVPs aren't shared in the app yet — but you can reply in one tap and paste it into the group chat.</p>
     <label class="rsvp-name"><span>Your name</span><input type="text" maxlength="40" autocomplete="given-name" data-reply-name value="${esc(store.get('fh:name', ''))}"></label>
     <div class="btn-row">${RSVP_STATUSES.map((s, i) => `<button class="btn btn-secondary btn-choice" type="button" data-reply-status="${s}" aria-pressed="${i === 0}">${esc(RSVP_LABELS[s])}</button>`).join('')}</div>
     <button class="btn btn-primary" type="button" data-copy-reply="${h.id}">${I.copy}<span>Copy my reply</span></button>
     <p class="muted">This copies a message for you to paste in the group chat. It doesn't publish a shared guest list.</p>
   </div>`;
-
 }
 
-function renderRsvpList(rsvps) {
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+
+function ago(ms) {
+  const min = Math.round((Date.now() - ms) / 60000);
+  if (min < 1) return 'just now';
+  if (min < 60) return `${min} min ago`;
+  const hr = Math.round(min / 60);
+  return hr < 24 ? `${hr} h ago` : `${Math.round(hr / 24)} days ago`;
+}
+
+function whoChip(e) {
+  const tags = [];
+  if (e.carpool === 'driving') tags.push(`driving${e.seats ? `, ${plural(e.seats, 'seat', 'seats')}` : ''}`);
+  if (e.carpool === 'need-ride') tags.push('needs a ride');
+  return `<li class="who${e.mine ? ' who-me' : ''}"><b>${esc(e.name)}</b>${e.guests ? `<em>+${e.guests}</em>` : ''}${e.mine ? '<span class="who-you">you</span>' : ''}${tags.length ? `<span class="who-tag">${esc(tags.join(' · '))}</span>` : ''}${e.pending ? '<span class="who-tag">not sent yet</span>' : ''}</li>`;
+}
+
+function renderRsvpList({ list, at, pending }, error) {
   const box = $('#view-detail .rsvp-list');
+  const tally = $('#view-detail [data-rsvp-tally]');
   if (!box) return;
-  if (!rsvps.length) { box.innerHTML = '<p class="muted">No replies yet.</p>'; return; }
-  box.innerHTML = RSVP_STATUSES.map((st) => {
-    const names = rsvps.filter((r) => r.status === st).map((r) => esc(r.name));
-    return names.length ? `<p><b>${esc(RSVP_LABELS[st])} (${names.length})</b><br>${names.join(', ')}</p>` : '';
+  const c = { coming: 0, maybe: 0, cant: 0, people: 0 };
+  for (const e of list) { c[e.status] += 1; if (e.status === 'coming') c.people += 1 + (e.guests || 0); }
+  if (tally) {
+    tally.innerHTML = list.length
+      ? `<span><b>${c.people}</b> coming</span><span><b>${c.maybe}</b> maybe</span><span><b>${c.cant}</b> can't</span>`
+      : '';
+  }
+
+  const groups = RSVP_STATUSES.map((st) => {
+    const people = list.filter((e) => e.status === st);
+    if (!people.length) return '';
+    const count = st === 'coming' ? plural(c.people, 'person', 'people') : String(people.length);
+    return `<div class="who-group"><h3 class="sub-h">${esc(RSVP_LABELS[st])} <span>${count}</span></h3><ul class="who-list">${people.map(whoChip).join('')}</ul></div>`;
   }).join('');
+
+  const going = list.filter((e) => e.status !== 'cant');
+  const drivers = going.filter((e) => e.carpool === 'driving');
+  const riders = going.filter((e) => e.carpool === 'need-ride');
+  const seats = drivers.reduce((n, e) => n + (e.seats || 0), 0);
+  const carpool = drivers.length || riders.length
+    ? `<p class="carpool-sum">${I.car}<span>${drivers.length ? `${plural(drivers.length, 'driver', 'drivers')} with ${plural(seats, 'spare seat', 'spare seats')}` : 'No drivers yet'}${riders.length ? ` · ${plural(riders.length, 'person needs', 'people need')} a ride: ${riders.map((e) => esc(e.name)).join(', ')}` : ''}</span></p>`
+    : '';
+
+  let status = '';
+  if (error && !at) status = `Couldn't load the list. ${error.code === 'network' ? 'No signal right now.' : esc(error.message)}`;
+  else if (error) status = `No signal. Showing the list from ${ago(at)}.`;
+  else if (at) status = `Updated ${ago(at)}`;
+  if (pending) status += `${status ? ' · ' : ''}Your reply sends when you have signal.`;
+
+  box.innerHTML = (list.length ? groups + carpool : at ? '<p class="muted">No replies yet. Be the first!</p>' : '')
+    + (status ? `<p class="fine">${status}</p>` : at ? '' : '<p class="muted">Loading who\'s coming…</p>');
+
+  // Fill the form with this phone's reply once it's known, unless they've started editing.
+  const form = $('#view-detail [data-rsvp-form]');
+  const mine = list.find((e) => e.mine);
+  if (form && form.dataset.dirty !== 'true' && mine) setFormReply(form, mine);
+  if (form) {
+    $('[data-rsvp-remove]', form).hidden = !mine;
+    const send = $('[data-rsvp-send]', form);
+    if (!send.disabled) send.textContent = mine ? 'Update my reply' : 'Send my reply'; // not while "Sending…"
+  }
+}
+
+function setPressed(form, attr, value) {
+  $$(`[${attr}]`, form).forEach((b) => b.setAttribute('aria-pressed', String(b.getAttribute(attr) === value)));
+}
+
+function setFormReply(form, r) {
+  const name = $('[data-rsvp-name]', form);
+  if (name && !name.value) name.value = r.name;
+  setPressed(form, 'data-rsvp-pick', r.status);
+  setPressed(form, 'data-rsvp-carpool', r.carpool || '');
+  $('[data-stepper="guests"] output', form).textContent = String(r.guests || 0);
+  if (r.seats) $('[data-stepper="seats"] output', form).textContent = String(r.seats);
+  syncForm(form);
+}
+
+// Show the extras only when they apply
+function syncForm(form) {
+  const status = $('[data-rsvp-pick][aria-pressed="true"]', form)?.dataset.rsvpPick || 'coming';
+  const carpool = $('[data-rsvp-carpool][aria-pressed="true"]', form)?.dataset.rsvpCarpool || '';
+  $('[data-rsvp-extras]', form).hidden = status === 'cant';
+  $('[data-seats]', form).hidden = carpool !== 'driving';
+}
+
+function readForm(form) {
+  const status = $('[data-rsvp-pick][aria-pressed="true"]', form)?.dataset.rsvpPick || 'coming';
+  const going = status !== 'cant';
+  const carpool = going ? $('[data-rsvp-carpool][aria-pressed="true"]', form)?.dataset.rsvpCarpool || '' : '';
+  return {
+    name: $('[data-rsvp-name]', form).value.replace(/\s+/g, ' ').trim(),
+    status,
+    guests: going ? Number($('[data-stepper="guests"] output', form).textContent) : 0,
+    carpool,
+    seats: carpool === 'driving' ? Number($('[data-stepper="seats"] output', form).textContent) : 0,
+  };
+}
+
+const replySummary = (r) => [
+  RSVP_LABELS[r.status],
+  r.guests ? `+${r.guests}` : '',
+  r.carpool === 'driving' ? `driving${r.seats ? `, ${plural(r.seats, 'seat', 'seats')}` : ''}` : r.carpool === 'need-ride' ? 'needs a ride' : '',
+].filter(Boolean).join(' · ');
+
+const savedToast = (r) => ({
+  coming: `You're in${r.guests ? ` (+${r.guests})` : ''}! Everyone can see it now.`,
+  maybe: 'Saved as a maybe. Everyone can see it now.',
+  cant: "Saved: can't make it. Thanks for letting everyone know.",
+})[r.status];
+
+async function sendReply(form, { claim = false } = {}) {
+  const hikeId = form.dataset.rsvpForm;
+  const reply = readForm(form);
+  const nameInput = $('[data-rsvp-name]', form);
+  if (!reply.name) {
+    toast('Add your name first');
+    nameInput.focus();
+    return;
+  }
+  store.set('fh:name', reply.name);
+  const btn = $('[data-rsvp-send]', form);
+  const claimBox = $('[data-rsvp-claim]', form);
+  btn.disabled = true;
+  btn.textContent = 'Sending…';
+  try {
+    const res = await setRsvp(hikeId, reply, { claim });
+    claimBox.hidden = true;
+    Object.assign(form.dataset, { dirty: 'false', statusTouched: 'false', extrasTouched: 'false' });
+    toast(res.queued ? "No signal. Your reply will send when you're back online." : savedToast(reply));
+  } catch (err) {
+    if (err.code === 'name_taken') {
+      // Same name from another phone: probably them on a second device, or a friend with the same name.
+      const ex = err.data.existing || { name: err.data.name };
+      claimBox.dataset.existing = JSON.stringify(ex);
+      claimBox.innerHTML = `<p><b>${esc(ex.name)}</b> already replied from another phone${ex.status ? ` (${esc(replySummary(ex))})` : ''}. Is that you?</p>
+        <div class="btn-row"><button class="btn btn-secondary" type="button" data-rsvp-claim-yes>Yes, that's me</button><button class="btn btn-secondary" type="button" data-rsvp-claim-no>No, I'm someone else</button></div>`;
+      claimBox.hidden = false;
+      claimBox.scrollIntoView({ block: 'nearest', behavior: reduceMotion() ? 'auto' : 'smooth' });
+    } else if (err.code === 'hike_over') {
+      toast('This hike is over, so replies are closed.');
+    } else {
+      toast(err.message || "Couldn't save your reply.");
+    }
+  } finally {
+    btn.disabled = false;
+    btn.textContent = myReply(hikeId) ? 'Update my reply' : 'Send my reply';
+  }
 }
 
 function startRsvp(h) {
   stopRsvp();
   if (!isRsvpLive()) return;
-  try {
-    rsvpUnsub = subscribeRsvps(h.id, renderRsvpList, (err) => {
-      const box = $('#view-detail .rsvp-list');
-      if (box) box.innerHTML = `<p class="muted">Couldn't load RSVPs: ${esc(err.message)}</p>`;
-    });
-  } catch (err) {
-    const box = $('#view-detail .rsvp-list');
-    if (box) box.innerHTML = `<p class="muted">Couldn't load RSVPs: ${esc(err.message)}</p>`;
-  }
+  rsvpUnsub = subscribeRsvps(h.id, (state) => renderRsvpList(state), (err, state) => renderRsvpList(state, err));
 }
 
 function stopRsvp() {
   if (rsvpUnsub) { try { rsvpUnsub(); } catch { /* already closed */ } }
   rsvpUnsub = null;
+}
+
+// Keep the lists (and the card counts) fresh: at start, when the phone comes
+// back online, and when the app returns to the foreground.
+function startRsvpSync() {
+  if (!isRsvpLive()) return;
+  onRsvpChange(fillGoing);
+  onRsvpProblem(({ hikeId, error }) => {
+    const h = hikeById(hikeId);
+    const why = error.code === 'name_taken' ? `${error.data.name} already replied. Open the hike to confirm it's you.`
+      : error.code === 'hike_over' ? 'the hike is over.' : error.message;
+    toast(`Your reply for ${h ? h.dateShort : 'a hike'} wasn't sent: ${why}`);
+  });
+  let last = 0;
+  const sync = () => {
+    if (document.hidden || Date.now() - last < 20_000) return;
+    last = Date.now();
+    refreshAll().catch(() => { /* no signal: the saved lists stay on screen */ });
+  };
+  sync();
+  window.addEventListener('online', () => { last = 0; sync(); });
+  document.addEventListener('visibilitychange', sync);
+}
+
+// "7 coming" on each hike card
+function fillGoing() {
+  if (!isRsvpLive()) return;
+  $$('[data-going]').forEach((el) => {
+    const { people } = countsFor(el.dataset.going);
+    el.hidden = !people;
+    $('span', el).textContent = `${people} coming`;
+  });
 }
 function replyText(h, name, status) {
   const verb = status === 'maybe' ? "I'm a maybe" : status === 'cant' ? "I can't make it" : "I'm in";
@@ -425,6 +635,11 @@ function renderDetail(h) {
         ${h.meet.address ? `<a class="btn btn-secondary" href="${esc(mapsUrl(h.maps))}" target="_blank" rel="noopener">${I.pin}<span>${esc(h.meet.address)}</span></a><p class="fine">Opens the meeting spot in Google Maps</p>` : ''}
       </section>
 
+      <section class="block block-rsvp" id="rsvp">
+        <h2>Who's coming</h2>
+        ${rsvpSectionHTML(h)}
+      </section>
+
       <section class="block">
         <h2>Trails</h2>
         <ul class="trail-list">${h.trails.map(trailRow).join('')}</ul>
@@ -472,10 +687,6 @@ function renderDetail(h) {
         <a class="btn btn-secondary" href="${esc(mapsUrl(h.backup.maps))}" target="_blank" rel="noopener">${I.swap}<span>Directions to ${esc(h.backup.name)}</span></a>
       </section>
 
-      <section class="block">
-        <h2>Who's coming</h2>
-        ${rsvpSectionHTML(h)}
-      </section>
       ${h.photo ? `<p class="photo-credit">${photoCredit(h.photo)}</p>` : ''}
     </div>`;
 
@@ -783,6 +994,9 @@ function route(animate = false) {
   if (h) {
     showTab('hikes');
     openDetail(h, animate);
+    if (/\/rsvp$/.test(hash)) {
+      requestAnimationFrame(() => $('#rsvp')?.scrollIntoView({ block: 'start', behavior: animate && !reduceMotion() ? 'smooth' : 'auto' }));
+    }
     return;
   }
   closeDetail(animate);
@@ -917,18 +1131,53 @@ document.addEventListener('click', async (e) => {
     sendQuestion(t.dataset.sendQuestion);
     return;
   }
-  if (t.matches('[data-rsvp-status]')) {
-    const hikeId = $('#view-detail').dataset.hike;
-    const input = $('#view-detail [data-rsvp-name]');
-    const name = (input?.value || '').trim().slice(0, 40);
-    if (!name) { toast('Add your name first'); input?.focus(); return; }
-    store.set('fh:name', name);
+  if (t.matches('[data-rsvp-pick], [data-rsvp-carpool]')) {
+    const form = t.closest('[data-rsvp-form]');
+    const attr = t.hasAttribute('data-rsvp-pick') ? 'data-rsvp-pick' : 'data-rsvp-carpool';
+    setPressed(form, attr, t.getAttribute(attr));
+    form.dataset.dirty = 'true';
+    form.dataset[attr === 'data-rsvp-pick' ? 'statusTouched' : 'extrasTouched'] = 'true';
+    syncForm(form);
+    return;
+  }
+  if (t.matches('[data-step]')) {
+    const box = t.closest('[data-stepper]');
+    const out = $('output', box);
+    const v = Math.min(Number(box.dataset.max), Math.max(Number(box.dataset.min), Number(out.textContent) + Number(t.dataset.step)));
+    out.textContent = String(v);
+    Object.assign(t.closest('[data-rsvp-form]').dataset, { dirty: 'true', extrasTouched: 'true' });
+    return;
+  }
+  if (t.matches('[data-rsvp-claim-yes]')) {
+    // Take over the earlier reply: keep its name and whatever this phone didn't change.
+    const form = t.closest('[data-rsvp-form]');
+    const ex = JSON.parse($('[data-rsvp-claim]', form).dataset.existing || '{}');
+    const merged = { ...readForm(form), name: ex.name || readForm(form).name };
+    if (form.dataset.statusTouched !== 'true' && ex.status) merged.status = ex.status;
+    if (form.dataset.extrasTouched !== 'true') Object.assign(merged, { guests: ex.guests || 0, carpool: ex.carpool || '', seats: ex.seats || 0 });
+    $('[data-rsvp-name]', form).value = merged.name;
+    setFormReply(form, merged);
+    sendReply(form, { claim: true });
+    return;
+  }
+  if (t.matches('[data-rsvp-claim-no]')) {
+    const form = t.closest('[data-rsvp-form]');
+    $('[data-rsvp-claim]', form).hidden = true;
+    const input = $('[data-rsvp-name]', form);
+    toast('Add your last initial so people can tell you apart, e.g. "Alex K"');
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
+    return;
+  }
+  if (t.matches('[data-rsvp-remove]')) {
+    const form = t.closest('[data-rsvp-form]');
     t.disabled = true;
     try {
-      await setRsvp(hikeId, { name, status: t.dataset.rsvpStatus });
-      toast(`Saved: ${RSVP_LABELS[t.dataset.rsvpStatus]}`);
+      const res = await removeRsvp(form.dataset.rsvpForm);
+      form.dataset.dirty = 'false';
+      toast(res.queued ? 'No signal. Your reply will be removed when you are back online.' : 'Your reply is removed.');
     } catch (err) {
-      toast(`Couldn't save your RSVP: ${err.message}`);
+      toast(err.message || "Couldn't remove your reply.");
     } finally {
       t.disabled = false;
     }
@@ -945,6 +1194,11 @@ document.addEventListener('mousedown', (e) => {
   if (e.target.closest('.chip-q, .send') && document.activeElement?.id === 'ask-input') e.preventDefault();
 });
 
+document.addEventListener('input', (e) => {
+  const form = e.target.closest?.('[data-rsvp-form]');
+  if (form) form.dataset.dirty = 'true';
+});
+
 document.addEventListener('change', (e) => {
   const cb = e.target.closest('input[data-check]');
   if (!cb) return;
@@ -954,6 +1208,11 @@ document.addEventListener('change', (e) => {
 });
 
 document.addEventListener('submit', (e) => {
+  if (e.target.matches('[data-rsvp-form]')) {
+    e.preventDefault();
+    sendReply(e.target);
+    return;
+  }
   if (e.target.id !== 'ask-form') return;
   e.preventDefault();
   const input = $('#ask-input');
@@ -1010,6 +1269,7 @@ renderShare();
 route(false);
 enableSwipeBack();
 fitViewport();
+startRsvpSync();
 
 setInterval(() => {
   if (document.hidden || currentTab !== 'hikes' || detailOpen) return;

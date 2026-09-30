@@ -1,0 +1,40 @@
+# Cloudflare Worker config for the Fall Hike App's shared RSVPs ("Who's coming").
+# Deploy: npx wrangler deploy   (see README.md in this folder)
+
+name = "fall-hike-rsvp"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+
+[vars]
+# Only the app's own site may call this Worker (comma-separate to add more,
+# e.g. "https://rmbk18.github.io,http://localhost:8000" for local testing).
+# Origins have no path: NOT https://rmbk18.github.io/Trail-Season/
+ALLOWED_ORIGIN = "https://rmbk18.github.io"
+
+# Where the app lives, for the "Open hike" button in RSVP alerts.
+APP_URL = "https://rmbk18.github.io/Trail-Season/"
+
+# Secrets, NOT set here (see README.md):
+#   NTFY_TOPIC    your private ntfy channel: an alert for every reply
+#   ADMIN_SECRET  any long random text: signs the "Remove reply" links in alerts
+
+# Every reply lives in one Durable Object with its own small SQLite database.
+# Free plan: SQLite-backed Durable Objects only (hence new_sqlite_classes).
+[[durable_objects.bindings]]
+name = "RSVPS"
+class_name = "RsvpStore"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["RsvpStore"]
+
+# Per-visitor limits (per IP address, per minute).
+[[ratelimits]]
+name = "WRITE_LIMITER"
+namespace_id = "1002"
+simple = { limit = 30, period = 60 }
+
+[[ratelimits]]
+name = "READ_LIMITER"
+namespace_id = "1003"
+simple = { limit = 120, period = 60 }

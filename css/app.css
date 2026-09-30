@@ -704,16 +704,81 @@ button.ans-link { border: 0; cursor: pointer; }
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
 
-/* ── Phase 2: RSVP (only rendered once Firestore is wired up) ── */
+/* ── Who's coming (shared RSVP) ───────────────────────────── */
+.block-rsvp { scroll-margin-top: calc(var(--safe-t) + 56px); }
 .rsvp-name { display: grid; gap: 6px; font-size: 14px; font-weight: 650; color: var(--ink-2); }
 .rsvp-name input {
   min-height: 46px; padding: 0 14px; border-radius: 12px;
   border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink);
   font: 16px var(--font-body);
 }
-.rsvp-buttons { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; }
-.rsvp-buttons .btn { padding: 0 8px; font-size: 15px; background: var(--surface-2); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
-.rsvp-list { margin-top: 12px; }
+.rsvp-name input:focus { outline: none; border-color: var(--action); box-shadow: 0 0 0 3px var(--action-soft); }
+
+.rsvp-tally { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 2px 0 14px; }
+.rsvp-tally:empty { display: none; }
+.rsvp-tally span {
+  display: flex; flex-direction: column; align-items: center; padding: 10px 6px;
+  border-radius: 14px; background: var(--surface-2); font-size: 13px; font-weight: 650; color: var(--ink-2);
+}
+.rsvp-tally b { font: 700 26px/1.1 var(--font-display); color: var(--heading); }
+.rsvp-tally span:first-child { background: var(--icon-soft); }
+.rsvp-tally span:first-child b { color: var(--icon); }
+
+.rsvp-form { display: grid; gap: 12px; }
+.rsvp-form .btn { margin-top: 0; }
+.rsvp-form .btn-text { min-height: 40px; }
+.rsvp-form .fine { margin-top: -4px; }
+
+/* Segmented choice: Coming / Maybe / Can't make it */
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; padding: 4px; border-radius: 14px; background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line); }
+.seg-btn {
+  min-height: 44px; padding: 0 6px; border: 0; border-radius: 11px;
+  background: transparent; color: var(--ink-2); font-size: 15px; font-weight: 700; cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.seg-btn[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12), 0 0 0 1px var(--line); }
+.seg > .seg-btn[data-rsvp-pick="coming"][aria-pressed="true"] { background: var(--easy); color: #fff; box-shadow: none; }
+.seg-sm .seg-btn { min-height: 38px; font-size: 13.5px; }
+
+.rsvp-extras { display: grid; gap: 10px; padding: 12px 14px; border-radius: 14px; background: var(--surface-2); }
+.rsvp-extras[hidden] { display: none; }
+.stepper-row, .carpool-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.carpool-row { flex-wrap: wrap; }
+.carpool-row .seg { flex: 1 1 100%; background: var(--surface); }
+.stepper-label { font-size: 15px; font-weight: 650; }
+.stepper-label small { display: block; font-size: 13px; font-weight: 500; color: var(--ink-2); }
+.stepper { display: inline-flex; align-items: center; gap: 4px; }
+.stepper button {
+  width: 38px; height: 38px; border: 0; border-radius: 50%;
+  background: var(--surface); color: var(--link); box-shadow: inset 0 0 0 1px var(--line);
+  font: 700 20px/1 var(--font-body); cursor: pointer;
+}
+.stepper button:active { background: var(--action-soft); }
+.stepper output { min-width: 26px; text-align: center; font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+.rsvp-claim { padding: 12px 14px; border-radius: 14px; background: var(--time-bg); color: var(--time-ink); border: 1px solid var(--time-line); font-size: 15px; }
+.rsvp-claim .btn-row .btn { margin-top: 10px; min-height: 44px; font-size: 14.5px; }
+
+.rsvp-list { margin-top: 16px; }
+.rsvp-list:empty { display: none; }
+.who-group + .who-group { margin-top: 10px; }
+.who-group .sub-h { display: flex; align-items: baseline; gap: 6px; margin: 0 0 6px; }
+.who-group .sub-h span { font-weight: 600; color: var(--ink-2); opacity: 0.8; }
+.who-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.who {
+  display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px;
+  padding: 6px 12px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line);
+  font-size: 14.5px; line-height: 1.3; overflow-wrap: anywhere;
+}
+.who b { font-weight: 650; }
+.who em { font-style: normal; font-weight: 700; color: var(--link); }
+.who-you { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--icon); }
+.who-tag { font-size: 13px; color: var(--ink-2); }
+.who-me { background: var(--icon-soft); border-color: transparent; }
+.carpool-sum { display: flex; gap: 8px; align-items: flex-start; margin-top: 12px; padding: 10px 12px; border-radius: 12px; background: var(--surface-2); font-size: 14.5px; }
+.carpool-sum .ic { width: 18px; height: 18px; margin-top: 1px; color: var(--icon); }
+.rsvp-list .fine { margin-top: 12px; }
+.fact-inline.going { color: var(--icon); font-weight: 650; }
 
 /* ── Weather forecast ─────────────────────────────────────── */
 .weather { display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: center; }
