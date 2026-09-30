@@ -1,0 +1,22 @@
+# Cloudflare Worker config for the Fall Hike App's live AI answers.
+# Deploy: npx wrangler deploy   (see README.md in this folder)
+
+name = "fall-hike-ai"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+
+[vars]
+# Only the app's own site may call this Worker (comma-separate to add more,
+# e.g. "https://rmbk18.github.io,http://localhost:8000" for local testing).
+# Origins have no path: NOT https://rmbk18.github.io/Trail-Season/
+ALLOWED_ORIGIN = "https://rmbk18.github.io"
+
+# ANTHROPIC_API_KEY is a secret, so it is NOT set here. Add it with:
+#   npx wrangler secret put ANTHROPIC_API_KEY
+
+# Per-visitor rate limit: 10 questions per minute per IP address.
+# Protects your Anthropic bill if someone finds the URL.
+[[ratelimits]]
+name = "RATE_LIMITER"
+namespace_id = "1001"
+simple = { limit = 10, period = 60 }

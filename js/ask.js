@@ -347,7 +347,7 @@ export function answer(raw, now = new Date()) {
 // is set AND the phone is online. In Phase 1 aiEndpoint is null, so this
 // always returns null and the user sees DONT_KNOW.
 //
-// CONFIG.aiEndpoint must point at YOUR server (example: /phase2/ai-proxy-worker.js).
+// CONFIG.aiEndpoint must point at YOUR server (the Cloudflare Worker in /phase2/ai-worker/).
 // That server holds ANTHROPIC_API_KEY, adds the hike plan as context, calls
 // the Anthropic Messages API and returns { "answer": "..." }.
 // Never call api.anthropic.com from this file and never put a key here.
