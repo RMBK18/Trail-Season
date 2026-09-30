@@ -3,8 +3,9 @@ Plan your perfect fall hike, offline A PWA for discovering and planning scenic a
 
 ## Phase 2: live AI answers
 
-The Ask tab answers from the hike plan offline. To also answer questions the plan doesn't cover,
-deploy the Cloudflare Worker in [`phase2/ai-worker/`](phase2/ai-worker/README.md) (it holds the
-Anthropic API key and calls Claude), then set `aiEndpoint` in `js/config.js` to its URL and bump
-`VERSION` in `sw.js`. Step-by-step instructions, tests and troubleshooting are in
+The Ask tab works in three steps: (1) fixed answers from the hike plan, offline; (2) if none
+match, the Cloudflare Worker in [`phase2/ai-worker/`](phase2/ai-worker/README.md) asks Claude,
+which may answer only from the plan and must quote it; (3) anything still unanswered goes to
+Summan (a push alert, plus a "Send to Summan" button for the asker). To turn on step 2, deploy
+the Worker, set `aiEndpoint` in `js/config.js` to its URL, and bump `VERSION` in `sw.js`. Step-by-step instructions, tests and troubleshooting are in
 [`phase2/ai-worker/README.md`](phase2/ai-worker/README.md).

@@ -17,7 +17,9 @@ if (!url) {
 }
 
 // Questions the app's offline FAQ can't answer, so these are the kind the
-// Worker actually gets. The last one checks it stays on topic.
+// Worker actually gets. Each one must come back either answered from the plan
+// or "unanswered" (sent to the organizer). The last one must be refused as
+// off topic. Unanswered ones trigger a real ntfy alert: that's the alert test.
 const EXAMPLES = custom.length
   ? [custom.join(' ')]
   : [
@@ -47,6 +49,7 @@ try {
   // 1. Health check (does not call Claude)
   const health = await fetch(url).then((r) => r.json());
   check('Worker is live', health.ok === true);
+  if (!health.alertsConfigured) console.log('NOTE  NTFY_TOPIC is not set, so unanswered questions send no alert');
   check('ANTHROPIC_API_KEY secret is set', health.apiKeyConfigured === true,
     health.apiKeyConfigured ? '' : 'run: npx wrangler secret put ANTHROPIC_API_KEY');
 
@@ -72,14 +75,19 @@ try {
 
 // 5. Real questions
 console.log('');
-for (const q of EXAMPLES) {
+for (const [i, q] of EXAMPLES.entries()) {
+  const mustBeOffTopic = !custom.length && i === EXAMPLES.length - 1;
   const t0 = Date.now();
   const res = await ask(q);
   const secs = ((Date.now() - t0) / 1000).toFixed(1);
   const data = await res.json().catch(() => ({}));
-  const good = res.ok && typeof data.answer === 'string' && data.answer.length > 0;
+  const good = res.ok && (mustBeOffTopic
+    ? data.status === 'off_topic'
+    : (data.status === 'answered' && typeof data.answer === 'string' && data.answer.length > 0) || data.status === 'unanswered');
   check(`"${q}"`, good, `${res.status}, ${secs}s`);
-  console.log(`      → ${data.answer ?? data.error ?? '(no body)'}\n`);
+  if (data.status === 'answered') console.log(`      → ${data.answer}\n`);
+  else if (data.status) console.log(`      → ${data.status}${data.forwarded ? ' (alert sent to the organizer)' : ''}\n`);
+  else console.log(`      → ${data.error ?? '(no body)'}\n`);
   if (res.status === 429) break; // rate limited: stop instead of hammering
 }
 

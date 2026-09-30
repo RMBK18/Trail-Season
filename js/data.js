@@ -30,6 +30,7 @@ export const GROUP = {
   swim: `No swimming on these hikes: none of the five parks has a swimming area, and the water is cold in October. Enjoy the falls from the trail.`,
   bikes: `Leave the bike at home: these are group hikes. Some of these parks allow bikes only on certain trails, so check the park's website before riding there another day.`,
   cell: `Signal is usually fine near the parking lots but can be patchy on the trails. This app works offline once it's installed. For directions with no signal, save the area in Google Maps for offline use before you leave.`,
+  emergency: `In an emergency, call 911 right away. Then let ${APP.askPerson} and the group know where you are.`,
 };
 
 export const HIKES = [
