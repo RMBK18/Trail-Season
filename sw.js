@@ -7,7 +7,7 @@
 // they open the app with a connection.
 // ─────────────────────────────────────────────────────────────
 
-const VERSION = 'fall-hike-2026-10-v14';
+const VERSION = 'fall-hike-2026-10-v15';
 
 const ASSETS = [
   './',
@@ -21,6 +21,9 @@ const ASSETS = [
   './js/icons.js',
   './js/lib.js',
   './js/rsvp.js',
+  './js/admin.js',
+  './js/editor.js',
+  './js/weather.js',
   './icons/icon.svg',
   './icons/icon-192.png',
   './icons/icon-512.png',
@@ -34,6 +37,9 @@ const ASSETS = [
   './img/hikes/rattlesnake-point.jpg',
   './img/hikes/balls-falls.jpg',
   './img/hikes/short-hills.jpg',
+  './fonts/dm-sans.woff2',
+  './fonts/libre-baskerville.woff2',
+  './fonts/libre-baskerville-italic.woff2',
 ];
 
 self.addEventListener('install', (event) => {
