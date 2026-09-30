@@ -13,12 +13,29 @@ export const APP = {
   // All five hikes fall in Eastern Daylight Time (DST ends Nov 1, 2026).
   tzOffset: '-04:00',
   timeZone: 'America/Toronto',
+  // Home screen headline, intro and chips (over the photo).
+  tagline: 'Five weekends. Five shades of fall.',
+  intro: 'A low-pressure hiking plan for friends: easy-to-moderate routes, memorable views and a clear plan for every Saturday in October.',
+  chips: ['5 Saturdays', 'Easy → moderate', '45 min–2 hr from Toronto'],
+  // Photos are from Wikimedia Commons under free licences; each is credited in the app.
+  photo: {
+    src: 'img/hikes/season.jpg',
+    alt: 'A hiker on a forest trail in fall',
+    author: 'Ajwm8103',
+    license: 'CC BY-SA 4.0',
+    licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0',
+    source: 'https://commons.wikimedia.org/wiki/File:Man_walking_through_Rattlesnake_Point.jpg',
+  },
 };
 
 // General hiking basics shown on every hike's checklist.
 // These are the only strings in the app that are not from the hike plan.
 // Delete items here if you want the checklist to be plan-only.
 export const BASICS = ['Water', 'Snacks', 'Layers', 'Sturdy shoes', 'Charged phone'];
+
+// Kid-friendly sign on each hike (hike.kids), set from its difficulty:
+// 'yes' = kid-friendly, 'easy-trail' = kid-friendly on the easy trail only, 'no' = not for kids.
+export const KIDS_LABELS = { yes: 'Kid-friendly', 'easy-trail': 'Kid-friendly: easy trail', no: 'Not for kids' };
 
 // Group rules and general tips for the Ask tab's quick answers.
 // rain, carpool and kids are the organizer's rules. The rest is general
@@ -50,6 +67,7 @@ export const HIKES = [
     meet: {
       time: '8:00 AM',
       place: 'the park gate',
+      address: '17760 McLaren Rd, Caledon',
       note: 'The gate opens at 8:00 sharp, no earlier.',
     },
     trails: [
@@ -74,16 +92,25 @@ export const HIKES = [
     dogs: 'Leashed dogs OK',
     picnic: 'Picnic tables',
     food: 'Belfountain village (about 5 min) or Erin (about 15 min)',
+    kids: 'yes',
     kidsNote: null,
     alerts: [
       { kind: 'permit', title: 'Every car needs a permit', text: 'Book an advance day-use permit at reservations.ontarioparks.com (~$18/vehicle).' },
       { kind: 'time', title: 'Gate opens at 8:00 sharp', text: 'No earlier. We meet there at 8:00 AM.' },
     ],
     bring: ['Advance day-use permit for your car (~$18/vehicle)', 'Leash, if your dog is coming'],
-    maps: 'Forks of the Credit Provincial Park, Caledon, ON',
+    maps: 'Forks of the Credit Provincial Park, 17760 McLaren Rd, Caledon, ON L7K 2H8',
     backup: { name: 'Mono Cliffs Provincial Park', maps: 'Mono Cliffs Provincial Park, ON' },
     fallbackTrailheads: null,
     accent: 'rust',
+    photo: {
+      src: 'img/hikes/forks-of-the-credit.jpg',
+      alt: 'A lake ringed with orange and red fall trees, reflecting the clouds',
+      author: 'chsyang',
+      license: 'Public domain',
+      licenseUrl: null,
+      source: 'https://commons.wikimedia.org/wiki/File:Forks_of_Credit_Provincial_Park%EF%BC%8CCanada_(53267092933).jpg',
+    },
   },
   {
     id: 'dundas-valley',
@@ -98,7 +125,7 @@ export const HIKES = [
     area: 'Dundas',
     level: 'EASY',
     optionLevel: 'MODERATE',
-    meet: { time: '8:00 AM', place: 'the Trail Centre', note: null },
+    meet: { time: '8:00 AM', place: 'the Trail Centre', address: '650 Governors Rd, Dundas', note: null },
     trails: [
       { name: 'Main Loop Trail', level: 'EASY', length: '3.4 km', time: '~90 min', note: null },
       { name: 'Heritage Trail', level: 'MODERATE', length: '5 km', time: null, note: 'Moderate option' },
@@ -117,15 +144,24 @@ export const HIKES = [
     dogs: 'Dogs OK',
     picnic: null,
     food: 'Downtown Dundas (about 10 min)',
+    kids: 'yes',
     kidsNote: null,
     alerts: [
       { kind: 'crowd', title: 'Thanksgiving weekend: extremely busy', text: 'Fallback trailheads: Headwaters, Monarch.' },
     ],
     bring: ['$11.50 per vehicle for entry (no reservation)'],
-    maps: 'Dundas Valley Conservation Area Trail Centre, Dundas, ON',
+    maps: 'Dundas Valley Conservation Area Trail Centre, 650 Governors Rd, Dundas, ON L9H 5E3',
     backup: { name: 'Hilton Falls, Milton', maps: 'Hilton Falls, Milton, ON' },
     fallbackTrailheads: ['Headwaters', 'Monarch'],
     accent: 'forest',
+    photo: {
+      src: 'img/hikes/dundas-valley.jpg',
+      alt: 'The Dundas Valley Conservation Area trail sign among fall trees',
+      author: 'Jaydenfromcanada',
+      license: 'CC BY-SA 4.0',
+      licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0',
+      source: 'https://commons.wikimedia.org/wiki/File:DundasValleyPark.jpg',
+    },
   },
   {
     id: 'rattlesnake-point',
@@ -140,7 +176,7 @@ export const HIKES = [
     area: 'Milton',
     level: 'MODERATE',
     optionLevel: 'EASY',
-    meet: { time: '8:30 AM', place: 'the gate', note: null },
+    meet: { time: '8:30 AM', place: 'the gate', address: '7200 Appleby Line, Milton', note: null },
     trails: [
       { name: 'Buffalo Crag Trail', level: 'MODERATE', length: '3 km', time: null, note: 'Escarpment-edge lookout over Nassagaweya Canyon' },
       { name: 'Vista Adventure Trail', level: 'EASY', length: '1.5 km', time: null, note: 'Easy option' },
@@ -159,15 +195,24 @@ export const HIKES = [
     dogs: 'Dogs OK',
     picnic: null,
     food: 'Milton (about 15–20 min)',
+    kids: 'easy-trail',
     kidsNote: 'Keep kids close at the cliff-edge lookouts.',
     alerts: [
       { kind: 'road', title: 'Appleby Line is CLOSED for construction', text: 'Detour: Derry Rd → Bell School Line → 14 Side Road (+15 min).' },
     ],
     bring: ['Online admission: $10.50+HST per adult', 'The detour: Derry Rd → Bell School Line → 14 Side Road'],
-    maps: 'Rattlesnake Point Conservation Area, Milton, ON',
+    maps: 'Rattlesnake Point Conservation Area, 7200 Appleby Line, Milton, ON L9E 0M9',
     backup: { name: 'Mount Nemo, Burlington', maps: 'Mount Nemo, Burlington, ON' },
     fallbackTrailheads: null,
     accent: 'amber',
+    photo: {
+      src: 'img/hikes/rattlesnake-point.jpg',
+      alt: 'View from the escarpment over farmland and fall trees',
+      author: 'Emily CA (MPL)',
+      license: 'CC BY-SA 4.0',
+      licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0',
+      source: 'https://commons.wikimedia.org/wiki/File:Rattlesnake_Point_Milton_Ontario.jpg',
+    },
   },
   {
     id: 'balls-falls',
@@ -182,7 +227,7 @@ export const HIKES = [
     area: 'Jordan (Niagara)',
     level: 'EASY',
     optionLevel: null,
-    meet: { time: '8:00 AM', place: 'the entrance', note: null },
+    meet: { time: '8:00 AM', place: 'the entrance', address: '3292 Sixth Ave, Jordan', note: null },
     trails: [
       { name: 'Cataract Trail', level: 'EASY', length: '~3.4 km', time: null, note: 'Between the 11 m Upper Falls and the 27 m Lower Falls' },
     ],
@@ -205,13 +250,22 @@ export const HIKES = [
     dogs: 'Dogs OK',
     picnic: null,
     food: 'Jordan Village (about 5 min)',
+    kids: 'yes',
     kidsNote: 'Keep kids back from the edges at the falls.',
     alerts: [],
     bring: ['Pass from niagara.goingtocamp.com ($15/vehicle, recommended)'],
-    maps: 'Balls Falls Conservation Area, Jordan, ON',
+    maps: "Ball's Falls Conservation Area, 3292 Sixth Ave, Jordan, ON L0R 1S0",
     backup: { name: 'Rock Point Provincial Park', maps: 'Rock Point Provincial Park, ON' },
     fallbackTrailheads: null,
     accent: 'falls',
+    photo: {
+      src: 'img/hikes/balls-falls.jpg',
+      alt: 'A waterfall behind red and yellow fall leaves',
+      author: 'John Vetterli from Toronto, Canada',
+      license: 'CC BY-SA 2.0',
+      licenseUrl: 'https://creativecommons.org/licenses/by-sa/2.0',
+      source: 'https://commons.wikimedia.org/wiki/File:Ball%27s_Falls_(272790578).jpg',
+    },
   },
   {
     id: 'short-hills',
@@ -226,7 +280,7 @@ export const HIKES = [
     area: 'St. Catharines',
     level: 'EASY',
     optionLevel: null,
-    meet: { time: '7:30 AM', place: null, note: 'Sunrise opening, the only true early start.' },
+    meet: { time: '7:30 AM', place: 'Parking Lot B', address: '193 Roland Rd, Pelham', note: 'Sunrise opening, the only true early start. The Palaeozoic Path starts from this lot.' },
     trails: [
       { name: 'Palaeozoic Path', level: 'EASY', length: '0.8 km', time: null, note: 'Barrier-free, to the Swayze Falls viewpoint' },
       { name: 'Scarlet Tanager Trail', level: 'EASY', length: '2.3 km', time: null, note: null },
@@ -245,6 +299,7 @@ export const HIKES = [
     dogs: null,
     picnic: null,
     food: 'Fonthill (about 10 min)',
+    kids: 'yes',
     kidsNote: null,
     alerts: [
       { kind: 'time', title: 'Meet 7:30 AM', text: 'Sunrise opening, the only true early start.' },
@@ -252,10 +307,18 @@ export const HIKES = [
       { kind: 'tick', title: 'Tick warning', text: 'Wear long pants and check yourself after.' },
     ],
     bring: ['Long pants (tick warning)', 'A washroom stop before you arrive (none in the park)', 'A tick check after the hike'],
-    maps: 'Short Hills Provincial Park, St. Catharines, ON',
+    maps: 'Short Hills Provincial Park Parking Lot B, 193 Roland Rd, Pelham, ON',
     backup: { name: 'Crawford Lake, Milton', maps: 'Crawford Lake, Milton, ON' },
     fallbackTrailheads: null,
     accent: 'dawn',
+    photo: {
+      src: 'img/hikes/short-hills.jpg',
+      alt: 'A leaf-covered forest trail in autumn',
+      author: 'KokoHoarse',
+      license: 'CC BY-SA 4.0',
+      licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0',
+      source: 'https://commons.wikimedia.org/wiki/File:Short_Hills_Provincial_Park_-Autumn_trail.jpg',
+    },
   },
 ];
 

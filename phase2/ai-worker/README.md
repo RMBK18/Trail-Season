@@ -114,10 +114,10 @@ to your Worker URL:
   aiEndpoint: 'https://fall-hike-ai.<your-subdomain>.workers.dev',
 ```
 
-Then in **`sw.js`**, raise the number at the end of `VERSION` by one, e.g. `v8` → `v9`:
+Then in **`sw.js`**, raise the number at the end of `VERSION` by one, e.g. `v10` → `v11`:
 
 ```js
-const VERSION = 'fall-hike-2026-10-v9';
+const VERSION = 'fall-hike-2026-10-v11';
 ```
 
 Commit and push. The service worker caches `config.js`, so **without the version bump, installed

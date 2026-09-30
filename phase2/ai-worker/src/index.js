@@ -21,7 +21,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { jsonSchemaOutputFormat } from '@anthropic-ai/sdk/helpers/json-schema';
 // The same file the app uses, bundled in at deploy time. After editing the
 // hike plan, redeploy the Worker so its answers match the app.
-import { HIKES, BASICS, APP, GROUP } from '../../../js/data.js';
+import { HIKES, BASICS, APP, GROUP, KIDS_LABELS } from '../../../js/data.js';
 
 const MODEL = 'claude-opus-5-5';
 const MAX_QUESTION_CHARS = 500; // askLiveAI() in js/ask.js sends at most 500
@@ -34,7 +34,7 @@ function hikeFacts(h) {
   const trail = (t) => [t.name, t.level, t.length, t.time, t.note].filter(Boolean).join(', ');
   return [
     `${h.dateLong}: ${h.park}, ${h.area}`,
-    `- Meet: ${h.meet.time}${h.meet.place ? ` at ${h.meet.place}` : ''}${h.meet.note ? `. ${h.meet.note}` : ''}`,
+    `- Meet: ${h.meet.time}${h.meet.place ? ` at ${h.meet.place}` : ''}${h.meet.address ? ` (${h.meet.address})` : ''}${h.meet.note ? `. ${h.meet.note}` : ''}`,
     `- Difficulty: ${h.level}${h.optionLevel ? `, with ${h.optionLevel === 'EASY' ? 'an' : 'a'} ${h.optionLevel} option` : ''}`,
     `- Trails: ${h.trails.map(trail).join('; ')}`,
     `- Highlights: ${h.fallLine}`,
@@ -43,6 +43,7 @@ function hikeFacts(h) {
     `- Washrooms: ${h.washrooms ?? 'not in the plan'}`,
     `- Dogs: ${h.dogs ?? 'not in the plan'}`,
     h.picnic && `- Picnic: ${h.picnic}`,
+    KIDS_LABELS[h.kids] && `- Kids: ${KIDS_LABELS[h.kids]}`,
     h.kidsNote && `- With kids: ${h.kidsNote}`,
     h.food && `- Food nearby: ${h.food}`,
     ...h.alerts.map((a) => `- Alert: ${a.title}. ${a.text}`),

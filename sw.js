@@ -7,7 +7,7 @@
 // they open the app with a connection.
 // ─────────────────────────────────────────────────────────────
 
-const VERSION = 'fall-hike-2026-10-v8';
+const VERSION = 'fall-hike-2026-10-v10';
 
 const ASSETS = [
   './',
@@ -28,6 +28,12 @@ const ASSETS = [
   './icons/icon-maskable-512.png',
   './icons/apple-touch-icon.png',
   './icons/favicon-32.png',
+  './img/hikes/season.jpg',
+  './img/hikes/forks-of-the-credit.jpg',
+  './img/hikes/dundas-valley.jpg',
+  './img/hikes/rattlesnake-point.jpg',
+  './img/hikes/balls-falls.jpg',
+  './img/hikes/short-hills.jpg',
 ];
 
 self.addEventListener('install', (event) => {
