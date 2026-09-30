@@ -7,6 +7,7 @@
 import { HIKES, BASICS, APP, GROUP } from './data.js';
 import { CONFIG } from './config.js';
 import { esc, mapsUrl, nextHike, torontoDateISO } from './lib.js';
+import { isRsvpLive, countsFor } from './rsvp.js';
 
 export const DONT_KNOW = `I don't know that one — ask ${APP.askPerson}!`;
 export const FORWARDED = `I don't know that one yet, so I've passed it on to ${APP.askPerson}. To get a reply, send it yourself too:`;
@@ -187,6 +188,17 @@ const list = (items) => `<ul class="ans-list">${items.map((i) => `<li>${i}</li>`
 const ext = (url, label) => `<a class="ans-link" href="${esc(url)}" target="_blank" rel="noopener">${esc(label)}</a>`;
 const open = (h) => `<a class="ans-link ans-link-soft" href="#/hike/${esc(h.id)}">Open the ${esc(h.dateShort.replace('Sat ', ''))} hike</a>`;
 const who = (h) => `<b>${esc(h.dateShort)}</b>, ${esc(h.shortName)}`;
+
+// RSVP: how to reply, plus the latest counts this phone has seen
+const rsvpHow = `<p>Open the hike and tap <b>Coming</b>, <b>Maybe</b> or <b>Can't make it</b> under Who's coming. Everyone sees the same list.</p>`;
+const rsvpList = (hikes) => {
+  const line = (h) => {
+    const c = countsFor(h.id);
+    const n = c.coming + c.maybe + c.cant;
+    return `${who(h)}: ${n ? `${c.people} coming, ${c.maybe} maybe` : 'no replies yet'}`;
+  };
+  return list(hikes.map(line)) + hikes.slice(0, 2).map((h) => `<a class="ans-link ans-link-soft" href="#/hike/${esc(h.id)}/rsvp">Reply for ${esc(h.dateShort.replace('Sat ', ''))}</a>`).join('');
+};
 const dontKnow = () => `<p>${esc(DONT_KNOW)}</p>`;
 const notInPlan = (what, h) => `<p>The plan doesn't list ${what} at ${esc(h.park)}.</p>` + dontKnow();
 
@@ -313,8 +325,10 @@ const ANSWERS = {
   bikes: { one: () => ANSWERS.bikes.all(), all: () => `<p>${esc(GROUP.bikes)}</p>` },
   cell: { one: () => ANSWERS.cell.all(), all: () => `<p>${esc(GROUP.cell)}</p>` },
   rsvp: {
-    one: () => ANSWERS.rsvp.all(),
-    all: () => `<p>RSVPs aren't in the app yet. Reply to the group invite so everyone knows who's coming.</p>`,
+    one: (h) => (isRsvpLive() ? rsvpHow + rsvpList([h]) : ANSWERS.rsvp.all()),
+    all: () => (isRsvpLive()
+      ? rsvpHow + rsvpList(HIKES.filter((h) => !nextHike() || h.dateISO >= nextHike().dateISO))
+      : `<p>RSVPs aren't in the app yet. Reply to the group invite so everyone knows who's coming.</p>`),
   },
   weather: {
     one: (h) => `<p>Check the weather card on the ${esc(h.dateShort)} hike details. The forecast updates as the date approaches.</p>`,
@@ -386,7 +400,9 @@ function answerFromPlan(raw, now) {
     return { html: dontKnow(), matched: false };
   }
 
-  if (strong.includes('rsvp')) return { matched: true, html: ANSWERS.rsvp.all() };
+  if (strong.includes('rsvp')) {
+    return { matched: true, html: hikes.length ? ANSWERS.rsvp.one(hikes[0]) : ANSWERS.rsvp.all() };
+  }
 
   if (!hikes.length) {
     return { matched: true, html: strong.map((id) => ANSWERS[id].all()).join('') + tail };

@@ -1,0 +1,15 @@
+{
+  "name": "fall-hike-rsvp",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Cloudflare Worker that keeps the Fall Hike App's shared RSVP list",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test:endpoint": "node test.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "^4.144.0"
+  }
+}
