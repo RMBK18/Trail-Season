@@ -5,7 +5,7 @@
 //   node test.mjs http://localhost:8787                 (after `npx wrangler dev`)
 //   node test.mjs <url> "Are there bears at Short Hills?"   (your own question)
 //
-// Each example question costs a fraction of a cent on your Anthropic account.
+// Each example question costs a fraction of a cent of your xAI credits.
 // ─────────────────────────────────────────────────────────────
 
 const [url, ...custom] = process.argv.slice(2);
@@ -46,12 +46,12 @@ const ask = (question, origin = ORIGIN) =>
 console.log(`Testing ${url} as origin ${ORIGIN}\n`);
 
 try {
-  // 1. Health check (does not call Claude)
+  // 1. Health check (does not call the AI)
   const health = await fetch(url).then((r) => r.json());
   check('Worker is live', health.ok === true);
   if (!health.alertsConfigured) console.log('NOTE  NTFY_TOPIC is not set, so unanswered questions send no alert');
-  check('ANTHROPIC_API_KEY secret is set', health.apiKeyConfigured === true,
-    health.apiKeyConfigured ? '' : 'run: npx wrangler secret put ANTHROPIC_API_KEY');
+  check('XAI_API_KEY secret is set', health.apiKeyConfigured === true,
+    health.apiKeyConfigured ? '' : 'add the XAI_API_KEY secret in the Worker settings');
 
   // 2. CORS preflight from the app's origin
   const pre = await fetch(url, {
@@ -65,7 +65,7 @@ try {
   const evil = await ask('hi', 'https://some-other-site.example');
   check('Other origins are blocked', evil.status === 403, `status ${evil.status}`);
 
-  // 4. Bad input is rejected without calling Claude
+  // 4. Bad input is rejected without calling the AI
   const empty = await ask('   ');
   check('Empty question is rejected', empty.status === 400, `status ${empty.status}`);
 } catch (err) {

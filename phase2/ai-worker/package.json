@@ -2,15 +2,12 @@
   "name": "fall-hike-ai",
   "version": "1.0.0",
   "private": true,
-  "description": "Cloudflare Worker that answers Fall Hike App questions with Claude",
+  "description": "Cloudflare Worker that answers Fall Hike App questions with Grok (xAI)",
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "test:endpoint": "node test.mjs"
-  },
-  "dependencies": {
-    "@anthropic-ai/sdk": "^0.129.0"
   },
   "devDependencies": {
     "wrangler": "^4.144.0"

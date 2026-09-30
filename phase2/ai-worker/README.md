@@ -3,7 +3,7 @@
 Every question in the Ask tab goes through three steps:
 
 1. **Fixed answers.** The app's offline FAQ answers from the hike plan. No network, no cost.
-2. **AI, only from your plan.** Anything else comes to this Worker. Claude may answer **only**
+2. **AI, only from your plan.** Anything else comes to this Worker. Grok (xAI) may answer **only**
    from the facts in `js/data.js`, and must quote the exact lines it used. The Worker checks
    every quote against the plan and throws the answer away if any quote doesn't match.
 3. **Unanswered → Summan.** If there's no verified answer, Summan gets a push alert (ntfy), and
@@ -13,27 +13,29 @@ Every question in the Ask tab goes through three steps:
 Phone ──question──▶ 1. Offline FAQ ──match──▶ answer
                          │ no match
                          ▼
-                    2. This Worker ──▶ Claude (plan facts only) ──▶ quote check ──pass──▶ "Live answer"
+                    2. This Worker ──▶ Grok (plan facts only) ──▶ quote check ──pass──▶ "Live answer"
                          │ not in the plan / check failed / error
                          ▼
                     3. Push alert to Summan  +  "Send to Summan" button for the asker
 ```
 
 - **Code:** `src/index.js`. The hike facts come from `../../js/data.js`, the same file the app uses.
-- **Model:** `claude-opus-5-5`, the current Claude Opus. (`claude-opus-4-1-20250805` was retired
-  on Aug 5, 2026, so calls to it now fail.) To change the model, edit `MODEL` in `src/index.js`.
+- **AI:** xAI's Grok API, model `grok-4.3` (about $1.25 / $2.50 per million input / output tokens).
+  To change the model, edit `XAI_MODEL` in `wrangler.toml` and redeploy.
 - **Security:** the API key lives only in Cloudflare as a secret. Only `https://rmbk18.github.io`
   may call the Worker, and each visitor can ask 10 questions per minute.
 - **Stateless:** the Worker stores and logs no questions or answers. Unanswered questions are
   passed straight to your ntfy alert and not kept anywhere.
-- **Cost:** roughly a cent per question that reaches the AI. Questions the offline FAQ answers cost nothing.
+- **Cost:** well under a cent per question that reaches the AI. Questions the offline FAQ answers
+  cost nothing. xAI gives new accounts free starter credits, which cover a small group easily.
 
 ## 1. Deploy
 
 You need:
 
-- An **Anthropic API key**: [console.anthropic.com](https://console.anthropic.com) → API Keys →
-  Create Key. While you're there, set a monthly spend limit under Settings → Limits.
+- An **xAI API key**: [console.x.ai](https://console.x.ai) → sign in → **API Keys** → **Create API key**.
+  Check your credits there too. Leave xAI's optional "data sharing" program off: it lets xAI
+  train on the questions your friends ask.
 - A free **Cloudflare account**: [dash.cloudflare.com/sign-up](https://dash.cloudflare.com/sign-up).
 - **Node.js 22 or newer** for option A: [nodejs.org](https://nodejs.org).
 
@@ -46,7 +48,7 @@ npm install
 
 npx wrangler login                        # opens a browser to sign in to Cloudflare
 npx wrangler deploy                       # first deploy; prints your Worker URL
-npx wrangler secret put ANTHROPIC_API_KEY # paste the key when asked (it's hidden)
+npx wrangler secret put XAI_API_KEY       # paste the key when asked (it's hidden)
 npx wrangler secret put NTFY_TOPIC        # your private alert channel name (see "Alerts" below)
 ```
 
@@ -57,7 +59,7 @@ npx wrangler secret put NTFY_TOPIC        # your private alert channel name (see
    https://fall-hike-ai.<your-subdomain>.workers.dev
    ```
    **Copy this URL.** You'll paste it into `js/config.js`.
-3. `wrangler secret put ANTHROPIC_API_KEY` stores the key encrypted in Cloudflare.
+3. `wrangler secret put XAI_API_KEY` stores the key encrypted in Cloudflare.
    It never goes into git or into the app.
 4. `wrangler secret put NTFY_TOPIC` stores your alert channel name the same way.
 
@@ -68,7 +70,7 @@ npx wrangler secret put NTFY_TOPIC        # your private alert channel name (see
 3. Set the project name to **`fall-hike-ai`** (it must match `name` in `wrangler.toml`) and the
    **root directory** (under advanced/build settings) to **`phase2/ai-worker`**. Deploy.
 4. Open the Worker → **Settings** → **Variables and Secrets** → **Add**. Type **Secret**,
-   name `ANTHROPIC_API_KEY`, value = your key. Add a second secret named `NTFY_TOPIC` with your
+   name `XAI_API_KEY`, value = your key. Add a second secret named `NTFY_TOPIC` with your
    alert channel name (see "Alerts" below). Save (this redeploys).
 5. The URL is shown on the Worker's overview page (also under Settings → Domains & Routes).
 
@@ -89,9 +91,10 @@ Anyone who knows the name can read the alerts, so keep it random and private. Wi
 
 | Name | Where it's set | Value |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | Secret: `npx wrangler secret put ANTHROPIC_API_KEY` or dashboard → Variables and Secrets | Your key, `sk-ant-...` |
+| `XAI_API_KEY` | Secret: `npx wrangler secret put XAI_API_KEY` or dashboard → Variables and Secrets | Your xAI key, `xai-...` |
 | `NTFY_TOPIC` | Secret: `npx wrangler secret put NTFY_TOPIC` or dashboard → Variables and Secrets | Your private ntfy channel name |
 | `ALLOWED_ORIGIN` | `[vars]` in `wrangler.toml` | `https://rmbk18.github.io` |
+| `XAI_MODEL` | `[vars]` in `wrangler.toml` | `grok-4.3` |
 
 `ALLOWED_ORIGIN` is the site's origin only: `https://rmbk18.github.io`, **not**
 `https://rmbk18.github.io/Trail-Season/`. For more than one origin, separate them with commas.
@@ -114,10 +117,10 @@ to your Worker URL:
   aiEndpoint: 'https://fall-hike-ai.<your-subdomain>.workers.dev',
 ```
 
-Then in **`sw.js`**, raise the number at the end of `VERSION` by one, e.g. `v10` → `v11`:
+Then in **`sw.js`**, raise the number at the end of `VERSION` by one, e.g. `v11` → `v12`:
 
 ```js
-const VERSION = 'fall-hike-2026-10-v11';
+const VERSION = 'fall-hike-2026-10-v12';
 ```
 
 Commit and push. The service worker caches `config.js`, so **without the version bump, installed
@@ -132,7 +135,7 @@ it opens the app online. If it doesn't, close the app fully and open it again.
 {"ok":true,"service":"fall-hike-ai","apiKeyConfigured":true,"alertsConfigured":true}
 ```
 
-This doesn't call Claude. `false` for either one means that secret isn't set.
+This doesn't call the AI. `false` for either one means that secret isn't set.
 
 **Test script** (from `phase2/ai-worker`):
 
@@ -147,13 +150,13 @@ must be refused as off topic:
 
 ```
 PASS  Worker is live
-PASS  ANTHROPIC_API_KEY secret is set
+PASS  XAI_API_KEY secret is set
 PASS  CORS preflight allows the app  (status 204, allow-origin https://rmbk18.github.io)
 PASS  Other origins are blocked  (status 403)
 PASS  Empty question is rejected  (status 400)
 
 PASS  "I have bad knees, which hike should I pick?"  (200, 3.1s)
-      → (Claude's answer, or "unanswered (alert sent to the organizer)")
+      → (Grok's answer, or "unanswered (alert sent to the organizer)")
 ```
 
 Ask your own question: `node test.mjs <url> "Can I bring my drone to Rattlesnake Point?"`
@@ -179,7 +182,7 @@ curl -X POST https://fall-hike-ai.<your-subdomain>.workers.dev \
 | Write me a poem about cats | "I can only help with the fall hikes." (no alert) |
 
 **Local testing** (optional): create `phase2/ai-worker/.dev.vars` (git-ignored) containing
-`ANTHROPIC_API_KEY=sk-ant-...`, then run `npx wrangler dev` and `node test.mjs http://localhost:8787`.
+`XAI_API_KEY=xai-...`, then run `npx wrangler dev` and `node test.mjs http://localhost:8787`.
 
 **Live logs:** `npx wrangler tail` shows errors as they happen. Questions are never logged.
 
@@ -188,11 +191,11 @@ curl -X POST https://fall-hike-ai.<your-subdomain>.workers.dev \
 | Symptom | Cause and fix |
 |---|---|
 | App always says "ask Summan!" for new questions | `aiEndpoint` is still `null`, or phones have the old cached `config.js`. Bump `VERSION` in `sw.js`, push, then fully close and reopen the app. |
-| Worker URL shows `"apiKeyConfigured":false` | Secret missing. Run `npx wrangler secret put ANTHROPIC_API_KEY`. |
+| Worker URL shows `"apiKeyConfigured":false` | Secret missing. Add `XAI_API_KEY` in the Worker's Variables and Secrets. |
 | `403 Origin not allowed` | `ALLOWED_ORIGIN` must be exactly `https://rmbk18.github.io` (no path). curl and scripts must send an `Origin` header. |
 | `500 AI service is misconfigured` | The key is wrong, revoked or unset. Create a new key and run `secret put` again. |
-| `429 Too many questions` | The 10-per-minute limit, or your Anthropic account's rate limit. Wait a minute, or raise `limit` in `wrangler.toml`. |
-| `502 AI service unavailable` | Anthropic is overloaded or down, or your account is out of credit (check console.anthropic.com → Billing). `npx wrangler tail` shows the status code. |
+| `429 Too many questions` | The 10-per-minute limit, or your xAI account's rate limit. Wait a minute, or raise `limit` in `wrangler.toml`. |
+| `502 AI service unavailable` | xAI is down, your credits ran out (check console.x.ai), or the model in `XAI_MODEL` was retired. `npx wrangler tail` shows xAI's error message. |
 | `504` or the app gives up | The answer took over 12 s. The app waits 15 s, then falls back to "ask Summan!". Try again. |
 | No ntfy alerts arrive | `alertsConfigured` is `false` (set the `NTFY_TOPIC` secret), or the name in the app doesn't exactly match the secret. Off-topic questions never send alerts. |
 | AI says it doesn't know something the plan covers | By design it answers only when it can quote the plan exactly. Add or reword the fact in `js/data.js` (or ask Summan to), then redeploy. |
@@ -204,7 +207,7 @@ curl -X POST https://fall-hike-ai.<your-subdomain>.workers.dev \
 
 - **Offline FAQ first.** `js/app.js` only calls the Worker when the offline FAQ has no match, so
   the AI never duplicates an FAQ answer and FAQ questions cost nothing.
-- **Only your facts.** Claude gets the facts from `js/data.js` and nothing else, is told not to
+- **Only your facts.** Grok gets the facts from `js/data.js` and nothing else, is told not to
   use general knowledge, and replies in a fixed format: `answered` (with quotes), `not_in_plan`
   or `off_topic`. An answer is shown only if every quote is found word for word in the plan.
   The quote check stops answers with no basis in the plan. It can't prove every word of an
@@ -212,8 +215,5 @@ curl -X POST https://fall-hike-ai.<your-subdomain>.workers.dev \
 - **Unanswered goes to Summan.** `not_in_plan`, a failed quote check, a refusal or an error all
   send an ntfy alert (if set up). Off-topic questions don't.
 - **Short and plain.** 1–2 friendly sentences, plain text (the app shows it with `textContent`).
-- **Refusal fallback.** If Claude's safety filters decline a harmless question, the API
-  automatically retries it on Anthropic's recommended fallback model (`fallbacks: "default"`).
-  To turn this off, delete the `betas` and `fallbacks` lines in `src/index.js`.
 - **Failures degrade quietly.** Every error returns a non-2xx status, the question is still
   sent to Summan, and the app shows the **Send to Summan** button. Nothing breaks.

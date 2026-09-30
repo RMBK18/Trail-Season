@@ -409,10 +409,10 @@ function answerFromPlan(raw, now) {
 // always returns null and the user sees DONT_KNOW.
 //
 // CONFIG.aiEndpoint must point at YOUR server (the Cloudflare Worker in /phase2/ai-worker/).
-// That server holds ANTHROPIC_API_KEY, answers only from the hike plan, and
+// That server holds the AI API key (XAI_API_KEY), answers only from the hike plan, and
 // returns { status: 'answered', answer } or { status: 'unanswered' | 'off_topic',
 // forwarded } (forwarded = the organizer got an alert).
-// Never call api.anthropic.com from this file and never put a key here.
+// Never call an AI API from this file and never put a key here.
 //
 // Returns { answer } or { answer: null, forwarded, offTopic }, or null when the
 // Worker can't be reached. The answer is shown with textContent (never innerHTML).
