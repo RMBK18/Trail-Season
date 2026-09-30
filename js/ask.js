@@ -207,10 +207,10 @@ const ANSWERS = {
   where: {
     one: (h) =>
       (h.meet.place
-        ? `<p>Meet at <b>${esc(h.meet.place)}</b> of ${esc(h.park)}, ${esc(h.area)}, at ${esc(h.meet.time)}.</p>`
+        ? `<p>Meet at <b>${esc(h.meet.place)}</b>, ${esc(h.park)}${h.meet.address ? ` (${esc(h.meet.address)})` : `, ${esc(h.area)}`}, at ${esc(h.meet.time)}.</p>`
         : `<p>Meet at ${esc(h.meet.time)}. The plan doesn't name a meeting spot inside ${esc(h.park)}.</p>` + dontKnow()) +
-      roadAlert(h) + ext(mapsUrl(h.maps), 'Directions in Google Maps'),
-    all: () => list(HIKES.map((h) => `${who(h)}: ${h.meet.place ? esc(h.meet.place) : 'meeting spot not in the plan'}`)),
+      roadAlert(h) + ext(mapsUrl(h.maps), 'Meeting spot in Google Maps'),
+    all: () => list(HIKES.map((h) => `${who(h)}: ${h.meet.place ? esc(h.meet.place) + (h.meet.address ? `, ${esc(h.meet.address)}` : '') : 'meeting spot not in the plan'}`)),
   },
   fees: {
     one: (h) => `<p><b>${esc(h.fee.amount)}</b>. ${esc(h.fee.note)}</p>` + (h.booking ? ext(h.booking.url, h.booking.label) : ''),
@@ -288,7 +288,7 @@ const ANSWERS = {
   },
   parking: {
     one: (h) =>
-      `<p>Park at ${esc(h.park)}${h.meet.place ? `, by ${esc(h.meet.place)} where we meet` : ''}. <b>${esc(h.fee.amount)}</b>. ${esc(h.fee.note)}</p>` +
+      `<p>Park at ${esc(h.park)}${h.meet.place ? `, by ${esc(h.meet.place)}${h.meet.address ? ` (${esc(h.meet.address)})` : ''} where we meet` : ''}. <b>${esc(h.fee.amount)}</b>. ${esc(h.fee.note)}</p>` +
       (h.meet.place ? '' : `<p>The plan doesn't say which parking lot we meet at.</p>` + dontKnow()) +
       (h.booking ? ext(h.booking.url, h.booking.label) : ''),
     all: () => `<p>Every park has parking. What you pay to get in:</p>` + list(HIKES.map((h) => `${who(h)}: <b>${esc(h.fee.amount)}</b>, ${esc(h.fee.short)}`)),

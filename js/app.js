@@ -1,4 +1,4 @@
-import { HIKES, BASICS, APP, hikeById } from './data.js';
+import { HIKES, BASICS, APP, KIDS_LABELS, hikeById } from './data.js';
 import { esc, mapsUrl, meetMs, endMs, statusOf, nextHike, isHikeDay, countdownParts } from './lib.js';
 import { answer, askLiveAI, isLiveAIOn, DONT_KNOW, FORWARDED, OFF_TOPIC_REPLY, SUGGESTIONS } from './ask.js';
 import { isRsvpLive, setRsvp, subscribeRsvps, RSVP_STATUSES, RSVP_LABELS } from './rsvp.js';
@@ -23,6 +23,9 @@ const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matche
 const badge = (level, opt = false) =>
   `<span class="badge badge-${level.toLowerCase()}${opt ? ' badge-opt' : ''}">${esc(level)}${opt ? ' option' : ''}</span>`;
 const levelBadges = (h) => badge(h.level) + (h.optionLevel ? badge(h.optionLevel, true) : '');
+const kidsTag = (h) =>
+  KIDS_LABELS[h.kids] ? `<span class="kids-tag kids-${esc(h.kids)}">${I.users}${esc(KIDS_LABELS[h.kids])}</span>` : '';
+const easiestTrail = (h) => h.trails.find((t) => t.level === 'EASY') || h.trails[0];
 const pad2 = (n) => String(n).padStart(2, '0');
 
 // ── Platform detection (install instructions) ───────────────
@@ -81,6 +84,7 @@ function inviteText(h) {
     `${h.park}, ${h.area}`,
     '',
     `⏰ Meet ${h.meet.time}${h.meet.place ? ` at ${h.meet.place}` : ''}.${h.meet.note ? ` ${h.meet.note}` : ''}`,
+    ...(h.meet.address ? [`📍 ${h.meet.address}: ${mapsUrl(h.maps)}`] : []),
     `🥾 ${trailsSummary(h)}`,
     `🍁 ${h.fallLine}`,
     `🚗 Drive: ${h.drive.text}`,
@@ -127,7 +131,7 @@ function cardHTML(h, now, nx) {
       <span class="card-top"><span class="card-date">${esc(h.dateShort)}</span>${chip}</span>
       <h3 class="card-park">${esc(h.park)}</h3>
       <span class="card-area">${esc(h.area)}</span>
-      <span class="card-badges">${levelBadges(h)}</span>
+      <span class="card-badges">${levelBadges(h)}${kidsTag(h)}</span>
       <span class="card-facts">
         <span class="fact-inline">${I.clock}Meet ${esc(h.meet.time)}</span>
         <span class="fact-inline">${I.car}${esc(h.drive.short)}</span>
@@ -334,6 +338,13 @@ async function loadWeather(h) {
     </div>`;
 }
 
+function kidsRow(h) {
+  if (!KIDS_LABELS[h.kids]) return '';
+  const t = easiestTrail(h);
+  const tip = h.kids === 'no' ? '' : ` With kids, try the ${t.name}${t.length ? ` (${t.length})` : ''}.`;
+  return `<li class="amen">${I.users}<div><b>Kids</b><span>${esc(KIDS_LABELS[h.kids] + '.' + tip + (h.kidsNote ? ' ' + h.kidsNote : ''))}</span></div></li>`;
+}
+
 function renderDetail(h) {
   const v = $('#view-detail');
   const washroomRow = h.noWashrooms
@@ -356,7 +367,7 @@ function renderDetail(h) {
       <p class="hero-date">${esc(h.dateLong)}</p>
       <h1 class="hero-title">${esc(h.park)}</h1>
       <p class="hero-area">${esc(h.area)}</p>
-      <div class="hero-badges">${levelBadges(h)}</div>
+      <div class="hero-badges">${levelBadges(h)}${kidsTag(h)}</div>
     </header>
 
     <div class="detail-body">
@@ -377,6 +388,7 @@ function renderDetail(h) {
         <p class="lead">Meet <b>${esc(h.meet.time)}</b>${h.meet.place ? ` at ${esc(h.meet.place)}` : ''}.</p>
         ${h.meet.note ? `<p>${esc(h.meet.note)}</p>` : ''}
         ${h.meet.place ? '' : `<p class="muted">The plan doesn't name a meeting spot inside the park. Ask ${esc(APP.askPerson)}.</p>`}
+        ${h.meet.address ? `<a class="btn btn-secondary" href="${esc(mapsUrl(h.maps))}" target="_blank" rel="noopener">${I.pin}<span>${esc(h.meet.address)}</span></a><p class="fine">Opens the meeting spot in Google Maps</p>` : ''}
       </section>
 
       <section class="block">
@@ -408,6 +420,7 @@ function renderDetail(h) {
         <h2>At the park</h2>
         <ul class="amenities">
           ${washroomRow}
+          ${kidsRow(h)}
           <li class="amen">${I.paw}<div><b>Dogs</b><span>${h.dogs ? esc(h.dogs) : 'Not listed in the plan'}</span></div></li>
           ${h.picnic ? `<li class="amen">${I.table}<div><b>Picnic</b><span>${esc(h.picnic)}</span></div></li>` : ''}
         </ul>
