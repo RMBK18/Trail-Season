@@ -94,10 +94,10 @@ to your Worker URL:
   aiEndpoint: 'https://fall-hike-ai.<your-subdomain>.workers.dev',
 ```
 
-Then in **`sw.js`**, bump the version, e.g.:
+Then in **`sw.js`**, raise the number at the end of `VERSION` by one, e.g. `v7` → `v8`:
 
 ```js
-const VERSION = 'fall-hike-2026-10-v7';
+const VERSION = 'fall-hike-2026-10-v8';
 ```
 
 Commit and push. The service worker caches `config.js`, so **without the version bump, installed
@@ -130,11 +130,11 @@ PASS  CORS preflight allows the app  (status 204, allow-origin https://rmbk18.gi
 PASS  Other origins are blocked  (status 403)
 PASS  Empty question is rejected  (status 400)
 
-PASS  "Is Short Hills good for kids?"  (200, 3.1s)
+PASS  "I have bad knees, which hike should I pick?"  (200, 3.1s)
       → (Claude's answer is printed here)
 ```
 
-Ask your own question: `node test.mjs <url> "Can I bring my bike to Dundas Valley?"`
+Ask your own question: `node test.mjs <url> "Can I bring my drone to Rattlesnake Point?"`
 
 **With curl** (macOS/Linux):
 
@@ -142,7 +142,7 @@ Ask your own question: `node test.mjs <url> "Can I bring my bike to Dundas Valle
 curl -X POST https://fall-hike-ai.<your-subdomain>.workers.dev \
   -H "Origin: https://rmbk18.github.io" \
   -H "Content-Type: application/json" \
-  -d '{"question":"Is Short Hills good for kids?"}'
+  -d '{"question":"I have bad knees, which hike should I pick?"}'
 ```
 
 **In the app:** Ask tab → type a question the FAQ can't answer:
@@ -150,9 +150,9 @@ curl -X POST https://fall-hike-ai.<your-subdomain>.workers.dev \
 | Question | Expected |
 |---|---|
 | What time do we meet on Oct 3? | Offline FAQ answer, no AI call |
-| Is Short Hills good for kids? | AI answer with a "Live answer" label |
-| I have bad knees, which hike should I pick? | AI answer |
-| Can I swim at Balls Falls? | AI answer |
+| Is Short Hills good for kids? | Offline FAQ answer, no AI call |
+| I have bad knees, which hike should I pick? | AI answer with a "Live answer" label |
+| Are there bears at Short Hills? | AI answer |
 | Write me a poem about cats | AI says it only helps with the hikes |
 
 **Local testing** (optional): create `phase2/ai-worker/.dev.vars` (git-ignored) containing

@@ -4,7 +4,7 @@
 // only from those facts. If the plan doesn't cover it, the answer says so.
 // ─────────────────────────────────────────────────────────────
 
-import { HIKES, BASICS, APP } from './data.js';
+import { HIKES, BASICS, APP, GROUP } from './data.js';
 import { CONFIG } from './config.js';
 import { esc, mapsUrl, nextHike, torontoDateISO } from './lib.js';
 
@@ -114,20 +114,28 @@ function detectHikes(q, now) {
 // A keyword starting with "~" is soft: it only counts when no other
 // (non-weak) topic has a hard match. "weak" topics only answer on their own.
 const TOPICS = [
+  { id: 'cancel', kws: ['cancel', 'cancels', 'cancelled', 'canceled', 'cancellation', 'postpone', 'postponed', 'reschedule', 'rescheduled', 'rain or shine', 'rain date', 'rain plan', 'if it rains', "if it's raining", 'if its raining', 'in the rain', 'bad weather', 'still on', 'still happening', 'called off', 'call it off'] },
+  { id: 'carpool', kws: ['carpool', 'carpools', 'carpooling', 'car pool', 'rideshare', 'ride share', 'need a ride', 'get a ride', 'give me a ride', 'give a ride', 'a lift', 'who is driving', "who's driving", 'whos driving', 'spare seat', 'spare seats', 'empty seat', 'empty seats'] },
   { id: 'rsvp', kws: ['rsvp', 'who is coming', "who's coming", 'whos coming', 'who is going', "who's going", 'whos going', 'attending', 'sign up', 'signup', 'count me in', 'headcount', "i'm in", 'im in', 'how many people', 'how many of us', 'who else'] },
   { id: 'ticks', kws: ['tick', 'ticks', 'lyme'] },
+  { id: 'kids', kws: ['kid', 'kids', 'child', 'children', 'toddler', 'toddlers', 'baby', 'babies', 'little one', 'little ones', 'son', 'daughter', 'family', 'families', 'family-friendly', 'family friendly'] },
   { id: 'access', kws: ['wheelchair', 'stroller', 'strollers', 'accessible', 'accessibility', 'barrier-free', 'barrier free', 'mobility'] },
   { id: 'washrooms', kws: ['washroom', 'washrooms', 'bathroom', 'bathrooms', 'toilet', 'toilets', 'restroom', 'restrooms', 'loo', 'outhouse', 'outhouses', 'pee', 'privy', 'facilities'] },
   { id: 'dogs', kws: ['dog', 'dogs', 'puppy', 'puppies', 'pup', 'pups', 'pet', 'pets', 'leash', 'leashed', 'doggo'] },
-  { id: 'fees', kws: ['fee', 'fees', 'cost', 'costs', 'price', 'prices', 'pay', 'paying', 'paid', '$', 'money', 'how much', 'permit', 'permits', 'book', 'booking', 'reserve', 'reservation', 'reservations', 'pass', 'passes', 'ticket', 'tickets', 'free', 'parking', 'admission', 'entry', 'hst', 'cash', 'expensive'] },
+  { id: 'parking', kws: ['parking', 'parking lot', 'parking lots', 'park the car', 'park my car', 'where to park', 'where do we park', 'where do i park', 'where should we park', 'where should i park'] },
+  { id: 'fees', kws: ['fee', 'fees', 'cost', 'costs', 'price', 'prices', 'pay', 'paying', 'paid', '$', 'money', 'how much', 'permit', 'permits', 'book', 'booking', 'reserve', 'reservation', 'reservations', 'pass', 'passes', 'ticket', 'tickets', 'free', 'admission', 'entry', 'hst', 'cash', 'expensive'] },
   { id: 'where', kws: ['where', 'location', 'address', 'directions', 'direction', 'map', 'maps', 'google maps', 'meeting spot', 'meeting point', 'gps', 'navigate', 'navigation', 'get there'] },
   { id: 'time', kws: ['what time', 'time', 'times', 'when', 'early', 'earliest', 'start', 'starts', 'starting', 'sunrise', "o'clock", 'arrive', 'arrival', 'gate open', 'gate opens', 'opens', 'opening', '~meet', '~meeting'] },
-  { id: 'drive', kws: ['drive', 'driving', 'drives', 'far', 'how far', '~car', '~cars', 'commute', '~away', '~travel', 'road', 'roads', 'traffic', 'detour', 'construction', 'appleby', 'carpool', 'carpooling', '~ride', '~rides', 'from toronto', 'from north york', 'north york', 'highway'] },
+  { id: 'drive', kws: ['drive', 'driving', 'drives', 'far', 'how far', '~car', '~cars', 'commute', '~away', '~travel', 'road', 'roads', 'traffic', 'detour', 'construction', 'appleby', '~ride', '~rides', 'from toronto', 'from north york', 'north york', 'highway'] },
   { id: 'difficulty', kws: ['hard', 'hardest', 'easy', 'easiest', 'difficult', 'difficulty', 'moderate', 'tough', 'toughest', 'beginner', 'beginners', '~level', '~levels', 'challenging', 'strenuous', 'intense', 'steep'] },
   { id: 'trails', kws: ['trail', 'trails', 'km', 'distance', '~how long', 'loop', 'length', 'kilometres', 'kilometers', 'miles', 'route', 'routes'] },
   { id: 'highlights', kws: ['~see', 'view', 'views', 'highlight', 'highlights', 'beautiful', 'pretty', 'scenic', 'scenery', 'waterfall', 'waterfalls', 'falls', 'special', 'colours', 'colors', 'colour', 'color', 'leaves', 'foliage', 'photo', 'photos', 'pictures', 'lookout', 'worth it'] },
   { id: 'bring', kws: ['~bring', 'pack', 'packing', 'wear', 'wearing', 'clothes', 'clothing', 'gear', 'checklist', 'shoes', 'boots', 'pants', 'prepare', 'prep', 'what do i need', 'what should i need'] },
   { id: 'backup', kws: ['backup', 'back up', 'back-up', 'plan b', 'alternative', 'alternatives', 'alternate', 'fallback', 'fall back', 'instead', 'crowd', 'crowds', 'crowded', 'busy', 'full'] },
+  { id: 'food', kws: ['food', 'restaurant', 'restaurants', 'coffee', 'cafe', 'cafes', 'eat', 'eating', 'lunch', 'breakfast', 'brunch', 'dinner', 'snack bar', 'tim hortons', 'tims', 'starbucks', 'hungry', 'grab a bite', 'bite to eat'] },
+  { id: 'swim', kws: ['swim', 'swimming', 'swimsuit', 'bathing suit', 'beach', 'beaches', 'wade', 'wading'] },
+  { id: 'bikes', kws: ['bike', 'bikes', 'biking', 'bicycle', 'bicycles', 'cycling', 'cyclist', 'mountain bike', 'mountain biking', 'mtb', 'ebike', 'e-bike', 'scooter'] },
+  { id: 'cell', kws: ['cell', 'cell service', 'cellphone', 'signal', 'reception', 'coverage', 'wifi', 'wi-fi', 'lte', '5g', 'data', 'phone service'] },
   { id: 'picnic', kws: ['picnic', 'picnics', 'picnic table', 'picnic tables', 'tables'] },
   { id: 'schedule', weak: true, kws: ['schedule', 'all hikes', 'all the hikes', 'hikes', 'list', 'dates', 'which weekends', 'what weekends', 'which saturdays', 'plan', 'itinerary', 'calendar', 'overview', 'season'] },
   { id: 'weather', kws: ['weather', 'rain', 'raining', 'rainy', 'snow', 'snowing', 'cold', 'warm', 'hot', 'sunny', 'wind', 'windy', 'forecast', 'temperature', 'temp'] },
@@ -138,12 +146,13 @@ const TOPICS = [
 // Subjects the plan says nothing about. If one of these is the point of the
 // question, the app must not guess, so it answers DONT_KNOW.
 const OFF_TOPIC = [
-  'rain', 'raining', 'rainy', 'weather', 'forecast', 'snow', 'cold', 'warm', 'temperature', 'hot', 'sunny', 'wind', 'windy',
-  'food', 'restaurant', 'restaurants', 'coffee', 'cafe', 'eat', 'eating', 'lunch', 'breakfast', 'dinner', 'snack bar',
-  'wifi', 'cell', 'signal', 'reception', 'kids', 'kid', 'children', 'child', 'baby', 'bike', 'bikes', 'cycling', 'swim', 'swimming',
   'camping', 'camp', 'fish', 'fishing', 'bear', 'bears', 'hunting', 'gas', 'charger', 'uber', 'transit', 'bus', 'train',
   'bbq', 'fire', 'alcohol', 'beer', 'wine', 'drone', 'drones', 'horse', 'horses', 'sunset', 'colour report', 'peak colour',
 ];
+
+// A specific topic replaces a broader one that the same question also triggers
+// ("Where do we park?" is about parking, not the meeting spot).
+const SUPERSEDES = { parking: ['fees', 'where'], food: ['where'], cancel: ['weather'], carpool: ['drive'] };
 
 function detectTopics(q) {
   let t = ' ' + q + ' ';
@@ -158,10 +167,12 @@ function detectTopics(q) {
   }).filter((x) => x.hard || x.soft);
 
   const anyHardStrong = hits.some((x) => x.hard && !x.topic.weak);
-  const strong = hits
+  const found = hits
     .filter((x) => !x.topic.weak)
     .filter((x) => x.hard || !anyHardStrong)
     .map((x) => x.topic.id);
+  const replaced = new Set(found.flatMap((id) => SUPERSEDES[id] || []));
+  const strong = found.filter((id) => !replaced.has(id));
   const weak = hits.filter((x) => x.topic.weak).map((x) => x.topic.id);
   const offTopic = OFF_TOPIC.some((w) => hasKw(t, w));
   return { strong: strong.slice(0, 3), weak, offTopic, anyHardStrong };
@@ -180,6 +191,7 @@ const trailLine = (t) => {
   const bits = [t.length, t.time].filter(Boolean).map(esc).join(', ');
   return `${badge(t.level)} <b>${esc(t.name)}</b>${bits ? `: ${bits}` : ''}${t.note ? `. ${esc(t.note)}` : ''}`;
 };
+const easiestTrail = (h) => h.trails.find((t) => t.level === 'EASY') || h.trails[0];
 const levelText = (h) => `${badge(h.level)}${h.optionLevel ? ` with ${h.optionLevel === 'EASY' ? 'an' : 'a'} ${badge(h.optionLevel)} option` : ''}`;
 const meetLine = (h) => `${esc(h.meet.time)}${h.meet.place ? ` at ${esc(h.meet.place)}` : ''}`;
 const roadAlert = (h) => h.alerts.filter((a) => a.kind === 'road').map((a) => `<p class="ans-warn"><b>${esc(a.title)}.</b> ${esc(a.text)}</p>`).join('');
@@ -259,6 +271,43 @@ const ANSWERS = {
         : notInPlan('a barrier-free trail', h),
     all: () => `<p>The only barrier-free trail in the plan is the <b>Palaeozoic Path</b> at Short Hills (Sat Oct 31): 0.8 km to the Swayze Falls viewpoint.</p>`,
   },
+  kids: {
+    one: (h) => {
+      const t = easiestTrail(h);
+      return `<p>${levelText(h)}. With kids, try the <b>${esc(t.name)}</b>${t.length ? ` (${esc(t.length)})` : ''}.${h.kidsNote ? ' ' + esc(h.kidsNote) : ''}</p>` +
+        `<p>${esc(GROUP.kids)}</p>`;
+    },
+    all: () =>
+      `<p>${esc(GROUP.kids)} The easiest trail on each hike:</p>` +
+      list(HIKES.map((h) => { const t = easiestTrail(h); return `${who(h)}: ${esc(t.name)}${t.length ? ` (${esc(t.length)})` : ''}`; })) +
+      `<p>The Palaeozoic Path at Short Hills is barrier-free, so it works for strollers.</p>`,
+  },
+  parking: {
+    one: (h) =>
+      `<p>Park at ${esc(h.park)}${h.meet.place ? `, by ${esc(h.meet.place)} where we meet` : ''}. <b>${esc(h.fee.amount)}</b>. ${esc(h.fee.note)}</p>` +
+      (h.meet.place ? '' : `<p>The plan doesn't say which parking lot we meet at.</p>` + dontKnow()) +
+      (h.booking ? ext(h.booking.url, h.booking.label) : ''),
+    all: () => `<p>Every park has parking. What you pay to get in:</p>` + list(HIKES.map((h) => `${who(h)}: <b>${esc(h.fee.amount)}</b>, ${esc(h.fee.short)}`)),
+  },
+  food: {
+    one: (h) =>
+      `<p>The plan doesn't list food at ${esc(h.park)}, so pack snacks.</p>` +
+      (h.food ? `<p>For coffee or a meal before or after: ${esc(h.food)}.</p>` : ''),
+    all: () =>
+      `<p>The plan doesn't list food at the parks, so pack snacks. For coffee or a meal before or after:</p>` +
+      list(HIKES.filter((h) => h.food).map((h) => `${who(h)}: ${esc(h.food)}`)),
+  },
+  cancel: {
+    one: (h) => `<p>${esc(GROUP.rain)}</p><p>Check the weather card on the ${esc(h.dateShort)} hike page.</p>`,
+    all: () => `<p>${esc(GROUP.rain)}</p><p>Each hike page has a live weather forecast.</p>`,
+  },
+  carpool: {
+    one: () => ANSWERS.carpool.all(),
+    all: () => `<p>${esc(GROUP.carpool)}</p>`,
+  },
+  swim: { one: () => ANSWERS.swim.all(), all: () => `<p>${esc(GROUP.swim)}</p>` },
+  bikes: { one: () => ANSWERS.bikes.all(), all: () => `<p>${esc(GROUP.bikes)}</p>` },
+  cell: { one: () => ANSWERS.cell.all(), all: () => `<p>${esc(GROUP.cell)}</p>` },
   rsvp: {
     one: () => ANSWERS.rsvp.all(),
     all: () => `<p>RSVPs aren't in the app yet. Reply to the group invite so everyone knows who's coming.</p>`,
