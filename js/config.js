@@ -11,7 +11,7 @@ export const CONFIG = {
   // The proxy runs the AI (Cloudflare Workers AI). This app only ever sends it a question.
   // After changing this, bump VERSION in /sw.js or installed phones keep the old value.
   // null = off: unmatched questions get "I don't know that one — ask Summan!"
-  aiEndpoint: null,
+  aiEndpoint: 'https://fall-hike-ai.rmbk-holdings.workers.dev',
 
   // PHASE 2: SHARED RSVP ("who's coming")
   // Paste the Firebase web config object from the Firebase console here,
