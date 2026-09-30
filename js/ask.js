@@ -278,7 +278,7 @@ const ANSWERS = {
         `<p>${esc(GROUP.kids)}</p>`;
     },
     all: () =>
-      `<p>${esc(GROUP.kids)} Every hike has an easy trail:</p>` +
+      `<p>${esc(GROUP.kids)} The easiest trail on each hike:</p>` +
       list(HIKES.map((h) => { const t = easiestTrail(h); return `${who(h)}: ${esc(t.name)}${t.length ? ` (${esc(t.length)})` : ''}`; })) +
       `<p>The Palaeozoic Path at Short Hills is barrier-free, so it works for strollers.</p>`,
   },

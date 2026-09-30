@@ -26,7 +26,7 @@ export const BASICS = ['Water', 'Snacks', 'Layers', 'Sturdy shoes', 'Charged pho
 export const GROUP = {
   rain: `We still go in light rain, so bring a rain jacket. If the weather looks bad, ${APP.askPerson} will post any change in the group chat the night before.`,
   carpool: `Carpools are sorted in the group chat. Post there if you need a ride or have spare seats.`,
-  kids: `Kids are welcome. Let ${APP.askPerson} know so we can plan the pace.`,
+  kids: `Kids are welcome on the kid-friendly trails. Check each hike's difficulty and decide whether it suits your kids.`,
   swim: `No swimming on these hikes: none of the five parks has a swimming area, and the water is cold in October. Enjoy the falls from the trail.`,
   bikes: `Leave the bike at home: these are group hikes. Some of these parks allow bikes only on certain trails, so check the park's website before riding there another day.`,
   cell: `Signal is usually fine near the parking lots but can be patchy on the trails. This app works offline once it's installed. For directions with no signal, save the area in Google Maps for offline use before you leave.`,
