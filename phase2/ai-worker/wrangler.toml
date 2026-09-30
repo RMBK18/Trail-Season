@@ -11,11 +11,16 @@ compatibility_date = "2026-09-01"
 # Origins have no path: NOT https://rmbk18.github.io/Trail-Season/
 ALLOWED_ORIGIN = "https://rmbk18.github.io"
 
-# ANTHROPIC_API_KEY is a secret, so it is NOT set here. Add it with:
-#   npx wrangler secret put ANTHROPIC_API_KEY
+# The xAI model to use. Change it here if xAI retires it (see docs.x.ai).
+XAI_MODEL = "grok-4.3"
+
+# XAI_API_KEY and NTFY_TOPIC are secrets, so they are NOT set here. Add them in
+# the Cloudflare dashboard (Worker → Settings → Variables and Secrets) or with:
+#   npx wrangler secret put XAI_API_KEY
+#   npx wrangler secret put NTFY_TOPIC
 
 # Per-visitor rate limit: 10 questions per minute per IP address.
-# Protects your Anthropic bill if someone finds the URL.
+# Protects your xAI credits if someone finds the URL.
 [[ratelimits]]
 name = "RATE_LIMITER"
 namespace_id = "1001"

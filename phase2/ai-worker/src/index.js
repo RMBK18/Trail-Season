@@ -3,7 +3,7 @@
 //
 // Step 2 of the Ask tab's three steps:
 //   1. The app's offline FAQ answers what it can (js/ask.js). No AI.
-//   2. Anything else comes here. Claude may answer ONLY from the facts in
+//   2. Anything else comes here. Grok (xAI) may answer ONLY from the facts in
 //      js/data.js, and must quote the lines it used. The Worker checks every
 //      quote against those facts and throws the answer away if one doesn't match.
 //   3. If there's no verified answer, the question goes to the organizer:
@@ -17,19 +17,21 @@
 // Stateless: questions and answers are never stored or logged here.
 // ─────────────────────────────────────────────────────────────
 
-import Anthropic from '@anthropic-ai/sdk';
-import { jsonSchemaOutputFormat } from '@anthropic-ai/sdk/helpers/json-schema';
 // The same file the app uses, bundled in at deploy time. After editing the
 // hike plan, redeploy the Worker so its answers match the app.
 import { HIKES, BASICS, APP, GROUP, KIDS_LABELS } from '../../../js/data.js';
 
-const MODEL = 'claude-opus-5-5';
+// xAI's Grok API (OpenAI-compatible Chat Completions). The model can be changed
+// with the XAI_MODEL variable in wrangler.toml, without touching this code.
+const XAI_URL = 'https://api.x.ai/v1/chat/completions';
+const DEFAULT_MODEL = 'grok-4.3';
+const TIMEOUT_MS = 12_000; // the app gives up after 15 s
 const MAX_QUESTION_CHARS = 500; // askLiveAI() in js/ask.js sends at most 500
 const MAX_BODY_CHARS = 4000;
 const MAX_ANSWER_CHARS = 600;
 const MIN_QUOTE_CHARS = 10; // at least one quote must be a real phrase, not a single word
 
-// ── The facts: everything Claude is allowed to use ──────────
+// ── The facts: everything the AI is allowed to use ──────────
 function hikeFacts(h) {
   const trail = (t) => [t.name, t.level, t.length, t.time, t.note].filter(Boolean).join(', ');
   return [
@@ -83,16 +85,24 @@ You may use today's date to work out which hike is next or how far away a date i
 
 ${FACTS}`;
 
-const ANSWER_FORMAT = jsonSchemaOutputFormat({
-  type: 'object',
-  properties: {
-    status: { type: 'string', enum: ['answered', 'not_in_plan', 'off_topic'] },
-    answer: { type: 'string' },
-    quotes: { type: 'array', items: { type: 'string' } },
+// Structured output: the API only lets the model reply in this exact JSON shape.
+const ANSWER_FORMAT = {
+  type: 'json_schema',
+  json_schema: {
+    name: 'hike_answer',
+    strict: true,
+    schema: {
+      type: 'object',
+      properties: {
+        status: { type: 'string', enum: ['answered', 'not_in_plan', 'off_topic'] },
+        answer: { type: 'string' },
+        quotes: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['status', 'answer', 'quotes'],
+      additionalProperties: false,
+    },
   },
-  required: ['status', 'answer', 'quotes'],
-  additionalProperties: false,
-}, { transform: false }); // send the schema as written, so the API enforces the status enum
+};
 
 // ── Quote check: every quote must appear in THE FACTS ────────
 const norm = (s) =>
@@ -111,7 +121,7 @@ function quotesCheckOut(quotes) {
   return qs.length > 0 && qs.every((q) => FACTS_NORM.includes(q)) && qs.some((q) => q.length >= MIN_QUOTE_CHARS);
 }
 
-// Keep answers short even if Claude runs long: cut at the last full sentence.
+// Keep answers short even if the model runs long: cut at the last full sentence.
 function trimAnswer(text) {
   const t = text.trim();
   if (t.length <= MAX_ANSWER_CHARS) return t;
@@ -171,48 +181,72 @@ function alertOrganizer(env, ctx, question) {
   return true;
 }
 
-// ── Step 2: Claude, restricted to THE FACTS ──────────────────
-// Returns { status: 'answered', answer } | { status: 'unanswered' } | { status: 'off_topic' }
-async function askClaude(env, question) {
-  const client = new Anthropic({
-    apiKey: env.ANTHROPIC_API_KEY,
-    maxRetries: 1, // one quick retry on 429/5xx; the app gives up after 15 s anyway
-    timeout: 12_000, // milliseconds
-  });
+// ── Step 2: Grok, restricted to THE FACTS ────────────────────
+class AIError extends Error {
+  constructor(kind, status = 0) {
+    super(`${kind}${status ? ` ${status}` : ''}`);
+    this.kind = kind; // 'http' | 'timeout' | 'network'
+    this.status = status;
+  }
+}
 
-  let message;
-  try {
-    message = await client.beta.messages.parse({
-      model: MODEL,
-      max_tokens: 4096, // thinking counts toward this too; replies are 1-2 sentences
-      output_config: { effort: 'low', format: ANSWER_FORMAT },
-      // If Claude's safety filters decline a harmless question, the API retries it
-      // on Anthropic's recommended fallback model instead of returning a refusal.
-      betas: ['server-side-fallback-2026-07-01'],
-      fallbacks: 'default',
-      // The facts are the same on every request, so cache them (only the facts
-      // are cached, never the question).
-      system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
-      messages: [
-        {
-          role: 'user',
-          content: `Today is ${todayInToronto()}.\n\n<question>\n${question}\n</question>`,
-        },
-      ],
-    });
-  } catch (err) {
-    if (err instanceof Anthropic.APIError) throw err; // network/API problems: handled by the caller
-    console.error('Unreadable reply from Claude:', err?.message ?? err);
+async function callGrok(env, question) {
+  const body = JSON.stringify({
+    model: env.XAI_MODEL || DEFAULT_MODEL,
+    max_tokens: 4096, // any reasoning counts toward this too; replies are 1-2 sentences
+    response_format: ANSWER_FORMAT,
+    messages: [
+      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'user', content: `Today is ${todayInToronto()}.\n\n<question>\n${question}\n</question>` },
+    ],
+  });
+  // One quick retry on rate limits and server errors.
+  for (let attempt = 0; ; attempt++) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+    let res;
+    try {
+      res = await fetch(XAI_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${env.XAI_API_KEY}` },
+        body,
+        signal: ctrl.signal,
+      });
+    } catch (err) {
+      throw new AIError(err?.name === 'AbortError' ? 'timeout' : 'network');
+    } finally {
+      clearTimeout(timer);
+    }
+    if (res.ok) return res.json();
+    if (attempt === 0 && (res.status === 429 || res.status >= 500)) {
+      await new Promise((r) => setTimeout(r, 600));
+      continue;
+    }
+    const detail = await res.text().catch(() => '');
+    console.error('xAI API error:', res.status, detail.slice(0, 300));
+    throw new AIError('http', res.status);
+  }
+}
+
+// Returns { status: 'answered', answer } | { status: 'unanswered' } | { status: 'off_topic' }
+async function askAI(env, question) {
+  const data = await callGrok(env, question);
+  const choice = data?.choices?.[0];
+  const content = choice?.message?.content;
+  if (!choice || choice.finish_reason === 'length' || choice.message?.refusal || typeof content !== 'string') {
     return { status: 'unanswered' };
   }
+  let out;
+  try {
+    out = JSON.parse(content);
+  } catch {
+    console.error('Unreadable reply from the AI');
+    return { status: 'unanswered' };
+  }
+  if (out?.status === 'off_topic') return { status: 'off_topic' };
+  if (out?.status !== 'answered') return { status: 'unanswered' };
 
-  if (message.stop_reason === 'refusal' || message.stop_reason === 'max_tokens') return { status: 'unanswered' };
-  const out = message.parsed_output;
-  if (!out) return { status: 'unanswered' };
-  if (out.status === 'off_topic') return { status: 'off_topic' };
-  if (out.status !== 'answered') return { status: 'unanswered' };
-
-  const answer = trimAnswer(out.answer || '');
+  const answer = trimAnswer(String(out.answer || ''));
   if (!answer || !quotesCheckOut(out.quotes)) {
     console.warn('Answer discarded: quotes did not match the facts');
     return { status: 'unanswered' };
@@ -220,26 +254,24 @@ async function askClaude(env, question) {
   return { status: 'answered', answer };
 }
 
-// Map Anthropic errors to what the app should get back. The app treats any
+// Map API problems to what the app should get back. The app treats any
 // non-2xx as "no live answer".
 function errorResponse(err, cors, forwarded) {
-  if (err instanceof Anthropic.RateLimitError) {
-    return json({ error: 'Too many questions right now. Try again in a minute.', forwarded }, 429, { ...cors, 'Retry-After': '60' });
-  }
-  if (err instanceof Anthropic.AuthenticationError || err instanceof Anthropic.PermissionDeniedError) {
-    console.error('Anthropic rejected the API key:', err.status);
-    return json({ error: 'AI service is misconfigured', forwarded }, 500, cors);
-  }
-  if (err instanceof Anthropic.APIConnectionTimeoutError) {
+  if (err instanceof AIError && err.kind === 'timeout') {
     return json({ error: 'AI took too long to answer', forwarded }, 504, cors);
   }
-  if (err instanceof Anthropic.APIConnectionError) {
-    console.error('Could not reach Anthropic:', err.message);
+  if (err instanceof AIError && err.kind === 'network') {
+    console.error('Could not reach xAI');
     return json({ error: 'AI service unavailable', forwarded }, 502, cors);
   }
-  if (err instanceof Anthropic.APIError) {
-    // 529 overloaded, 5xx, or a 400 from a bad request shape
-    console.error('Anthropic API error:', err.status, err.type ?? '');
+  if (err instanceof AIError && err.status === 429) {
+    return json({ error: 'Too many questions right now. Try again in a minute.', forwarded }, 429, { ...cors, 'Retry-After': '60' });
+  }
+  if (err instanceof AIError && (err.status === 401 || err.status === 403)) {
+    return json({ error: 'AI service is misconfigured', forwarded }, 500, cors);
+  }
+  if (err instanceof AIError) {
+    // 5xx, or a 400 (for example a retired model name or no credits left)
     return json({ error: 'AI service unavailable', forwarded }, 502, cors);
   }
   console.error('Unexpected error:', err?.message ?? err);
@@ -250,12 +282,12 @@ function errorResponse(err, cors, forwarded) {
 export default {
   async fetch(request, env, ctx) {
     // Health check: open the Worker URL in a browser to see it's live.
-    // Does not call Claude.
+    // Does not call the AI.
     if (request.method === 'GET' || request.method === 'HEAD') {
       return json({
         ok: true,
         service: 'fall-hike-ai',
-        apiKeyConfigured: Boolean(env.ANTHROPIC_API_KEY),
+        apiKeyConfigured: Boolean(env.XAI_API_KEY),
         alertsConfigured: Boolean(env.NTFY_TOPIC),
       }, 200);
     }
@@ -294,14 +326,14 @@ export default {
       return json({ error: `Question is too long (max ${MAX_QUESTION_CHARS} characters)` }, 400, cors);
     }
 
-    if (!env.ANTHROPIC_API_KEY) {
-      console.error('ANTHROPIC_API_KEY is not set. Run: npx wrangler secret put ANTHROPIC_API_KEY');
+    if (!env.XAI_API_KEY) {
+      console.error('XAI_API_KEY is not set. Add it as a secret in the Worker settings.');
       const forwarded = alertOrganizer(env, ctx, question);
       return json({ error: 'AI service is misconfigured', forwarded }, 500, cors);
     }
 
     try {
-      const result = await askClaude(env, question);
+      const result = await askAI(env, question);
       if (result.status === 'answered') return json({ status: 'answered', answer: result.answer }, 200, cors);
       if (result.status === 'off_topic') return json({ status: 'off_topic', forwarded: false }, 200, cors);
       const forwarded = alertOrganizer(env, ctx, question);
