@@ -5,40 +5,40 @@
    ───────────────────────────────────────────────────────────── */
 
 :root {
-  --forest: #1d3a2a;
-  --forest-deep: #142a1e;
-  --forest-mid: #2a4f3a;
-  --cream: #fbf3e4;
-  --amber: #e4a338;
+  --forest: #173c2c;
+  --forest-deep: #0e2a1f;
+  --forest-mid: #245a3f;
+  --cream: #fffdf7;
+  --amber: #e7a62b;
   --amber-ink: #3a2403;
   --amber-line: #b7791a;
   --easy: #2e7143;
 
-  --bg: #f2e9d9;
-  --surface: #fffaf2;
-  --surface-2: #f7eee0;
-  --ink: #2a2019;
-  --ink-2: #6a5847;
-  --line: #e2d3bc;
-  --line-strong: #c9b597;
-  --action: #a8461c;
-  --action-press: #8c3915;
-  --link: #a8461c;
-  --icon: #2a4f3a;
+  --bg: #f7f2e7;
+  --surface: #fffdf7;
+  --surface-2: #f0e7d4;
+  --ink: #183126;
+  --ink-2: #5f695f;
+  --line: #d9cdb8;
+  --line-strong: #c4b89f;
+  --action: #d8602f;
+  --action-press: #b34d24;
+  --link: #b34d24;
+  --icon: #245a3f;
   --warn-bg: #fbe5d3;
   --warn-ink: #74290b;
   --warn-line: #efc4a2;
   --time-bg: #fcefd0;
   --time-ink: #5f3f06;
   --time-line: #efd49a;
-  --tab-bg: rgba(255, 250, 242, 0.9);
+  --tab-bg: rgba(255, 253, 247, 0.9);
   --hero-floor: var(--bg);
-  --shadow: 0 1px 0 rgba(60, 40, 20, 0.05), 0 6px 18px -10px rgba(60, 40, 20, 0.35);
+  --shadow: 0 18px 50px rgba(42, 49, 35, .13);
 
-  /* Serif headings, like the muse design; system fonts so it works offline */
-  --font-display: ui-serif, 'New York', 'Iowan Old Style', Georgia, 'Noto Serif', 'Times New Roman', serif;
+  /* Libre Baskerville for headings, DM Sans for body — the Fall Hike App pairing */
+  --font-display: 'Libre Baskerville', Georgia, 'Times New Roman', serif;
   --heading: var(--forest);
-  --font-body: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+  --font-body: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 
   --safe-t: env(safe-area-inset-top, 0px);
   --safe-b: env(safe-area-inset-bottom, 0px);
@@ -46,6 +46,7 @@
 
   color-scheme: light dark;
 }
+
 
 @media (prefers-color-scheme: dark) {
   :root {
