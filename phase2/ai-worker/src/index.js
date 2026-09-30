@@ -3,7 +3,7 @@
 //
 // Step 2 of the Ask tab's three steps:
 //   1. The app's offline FAQ answers what it can (js/ask.js). No AI.
-//   2. Anything else comes here. Grok (xAI) may answer ONLY from the facts in
+//   2. Anything else comes here. Cloudflare Workers AI may answer ONLY from the facts in
 //      js/data.js, and must quote the lines it used. The Worker checks every
 //      quote against those facts and throws the answer away if one doesn't match.
 //   3. If there's no verified answer, the question goes to the organizer:
@@ -21,10 +21,10 @@
 // hike plan, redeploy the Worker so its answers match the app.
 import { HIKES, BASICS, APP, GROUP, KIDS_LABELS } from '../../../js/data.js';
 
-// xAI's Grok API (OpenAI-compatible Chat Completions). The model can be changed
-// with the XAI_MODEL variable in wrangler.toml, without touching this code.
-const XAI_URL = 'https://api.x.ai/v1/chat/completions';
-const DEFAULT_MODEL = 'grok-4.3';
+// Cloudflare Workers AI, through the `AI` binding in wrangler.toml: no API key,
+// and Cloudflare's free daily allowance covers a small group. The model can be
+// changed with the AI_MODEL variable in wrangler.toml, without touching this code.
+const DEFAULT_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 const TIMEOUT_MS = 12_000; // the app gives up after 15 s
 const MAX_QUESTION_CHARS = 500; // askLiveAI() in js/ask.js sends at most 500
 const MAX_BODY_CHARS = 4000;
@@ -76,7 +76,7 @@ The app's offline FAQ has already tried the question and found no match, so ques
 
 Answer ONLY from THE FACTS below. They are everything ${APP.askPerson} has written down. Do not use general knowledge, outside facts, or guesses, even about well-known parks. Do not add advice, details or reassurance that THE FACTS don't state.
 
-Reply in the required JSON:
+Reply with only a JSON object of this shape: {"status": "...", "answer": "...", "quotes": ["..."]}
 - status "answered": THE FACTS fully answer the question. Put a friendly, plain-text answer of 1 or 2 short sentences in "answer" (no markdown). In "quotes", copy the exact phrases from THE FACTS that support every fact in your answer, word for word. The app checks each quote against THE FACTS and discards the answer if any quote doesn't match.
 - status "not_in_plan": the question is about the hikes, the trip or hiking, but THE FACTS don't fully answer it. Leave "answer" empty and "quotes" empty. ${APP.askPerson} will answer it personally. When in doubt, choose this.
 - status "off_topic": the question has nothing to do with the hikes or the trip. Leave "answer" and "quotes" empty.
@@ -85,22 +85,19 @@ You may use today's date to work out which hike is next or how far away a date i
 
 ${FACTS}`;
 
-// Structured output: the API only lets the model reply in this exact JSON shape.
+// JSON Mode: asks the model to reply in this exact JSON shape. Workers AI
+// doesn't guarantee it, so askAI() checks the reply anyway.
 const ANSWER_FORMAT = {
   type: 'json_schema',
   json_schema: {
-    name: 'hike_answer',
-    strict: true,
-    schema: {
-      type: 'object',
-      properties: {
-        status: { type: 'string', enum: ['answered', 'not_in_plan', 'off_topic'] },
-        answer: { type: 'string' },
-        quotes: { type: 'array', items: { type: 'string' } },
-      },
-      required: ['status', 'answer', 'quotes'],
-      additionalProperties: false,
+    type: 'object',
+    properties: {
+      status: { type: 'string', enum: ['answered', 'not_in_plan', 'off_topic'] },
+      answer: { type: 'string' },
+      quotes: { type: 'array', items: { type: 'string' } },
     },
+    required: ['status', 'answer', 'quotes'],
+    additionalProperties: false,
   },
 };
 
@@ -181,70 +178,68 @@ function alertOrganizer(env, ctx, question) {
   return true;
 }
 
-// ── Step 2: Grok, restricted to THE FACTS ────────────────────
+// ── Step 2: Workers AI, restricted to THE FACTS ──────────────
 class AIError extends Error {
-  constructor(kind, status = 0) {
-    super(`${kind}${status ? ` ${status}` : ''}`);
-    this.kind = kind; // 'http' | 'timeout' | 'network'
-    this.status = status;
+  constructor(kind, detail = '') {
+    super(`${kind}${detail ? `: ${detail}` : ''}`);
+    this.kind = kind; // 'timeout' | 'failed'
   }
 }
 
-async function callGrok(env, question) {
-  const body = JSON.stringify({
-    model: env.XAI_MODEL || DEFAULT_MODEL,
-    max_tokens: 4096, // any reasoning counts toward this too; replies are 1-2 sentences
-    response_format: ANSWER_FORMAT,
+async function runModel(env, question) {
+  const input = {
     messages: [
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'user', content: `Today is ${todayInToronto()}.\n\n<question>\n${question}\n</question>` },
     ],
-  });
-  // One quick retry on rate limits and server errors.
+    response_format: ANSWER_FORMAT,
+    max_tokens: 600, // the model's default (256) can cut the JSON off
+    temperature: 0.2, // stick closely to the facts
+  };
+  // One quick retry if Workers AI fails (for example, briefly out of capacity).
   for (let attempt = 0; ; attempt++) {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
-    let res;
+    let timer;
+    const timeout = new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new AIError('timeout')), TIMEOUT_MS);
+    });
     try {
-      res = await fetch(XAI_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${env.XAI_API_KEY}` },
-        body,
-        signal: ctrl.signal,
-      });
+      return await Promise.race([env.AI.run(env.AI_MODEL || DEFAULT_MODEL, input), timeout]);
     } catch (err) {
-      throw new AIError(err?.name === 'AbortError' ? 'timeout' : 'network');
+      if (err instanceof AIError) throw err;
+      console.error('Workers AI error:', String(err?.message ?? err).slice(0, 300));
+      if (attempt === 0) {
+        await new Promise((r) => setTimeout(r, 600));
+        continue;
+      }
+      throw new AIError('failed', String(err?.message ?? err));
     } finally {
       clearTimeout(timer);
     }
-    if (res.ok) return res.json();
-    if (attempt === 0 && (res.status === 429 || res.status >= 500)) {
-      await new Promise((r) => setTimeout(r, 600));
-      continue;
-    }
-    const detail = await res.text().catch(() => '');
-    console.error('xAI API error:', res.status, detail.slice(0, 300));
-    throw new AIError('http', res.status);
+  }
+}
+
+// JSON Mode usually returns `response` as an object; accept a JSON string too.
+function readReply(result) {
+  const r = result?.response;
+  if (r && typeof r === 'object') return r;
+  if (typeof r !== 'string') return null;
+  const text = r.trim().replace(/^```(?:json)?\s*|\s*```$/g, '');
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
   }
 }
 
 // Returns { status: 'answered', answer } | { status: 'unanswered' } | { status: 'off_topic' }
 async function askAI(env, question) {
-  const data = await callGrok(env, question);
-  const choice = data?.choices?.[0];
-  const content = choice?.message?.content;
-  if (!choice || choice.finish_reason === 'length' || choice.message?.refusal || typeof content !== 'string') {
-    return { status: 'unanswered' };
-  }
-  let out;
-  try {
-    out = JSON.parse(content);
-  } catch {
+  const out = readReply(await runModel(env, question));
+  if (!out) {
     console.error('Unreadable reply from the AI');
     return { status: 'unanswered' };
   }
-  if (out?.status === 'off_topic') return { status: 'off_topic' };
-  if (out?.status !== 'answered') return { status: 'unanswered' };
+  if (out.status === 'off_topic') return { status: 'off_topic' };
+  if (out.status !== 'answered') return { status: 'unanswered' };
 
   const answer = trimAnswer(String(out.answer || ''));
   if (!answer || !quotesCheckOut(out.quotes)) {
@@ -254,24 +249,18 @@ async function askAI(env, question) {
   return { status: 'answered', answer };
 }
 
-// Map API problems to what the app should get back. The app treats any
+// Map AI problems to what the app should get back. The app treats any
 // non-2xx as "no live answer".
 function errorResponse(err, cors, forwarded) {
   if (err instanceof AIError && err.kind === 'timeout') {
     return json({ error: 'AI took too long to answer', forwarded }, 504, cors);
   }
-  if (err instanceof AIError && err.kind === 'network') {
-    console.error('Could not reach xAI');
-    return json({ error: 'AI service unavailable', forwarded }, 502, cors);
-  }
-  if (err instanceof AIError && err.status === 429) {
-    return json({ error: 'Too many questions right now. Try again in a minute.', forwarded }, 429, { ...cors, 'Retry-After': '60' });
-  }
-  if (err instanceof AIError && (err.status === 401 || err.status === 403)) {
-    return json({ error: 'AI service is misconfigured', forwarded }, 500, cors);
+  if (err instanceof AIError && /limit|allocation|neuron|quota|429/i.test(err.message)) {
+    // Free daily allowance used up (resets 00:00 UTC) or Workers AI rate limit
+    return json({ error: 'Too many questions right now. Try again later.', forwarded }, 429, { ...cors, 'Retry-After': '3600' });
   }
   if (err instanceof AIError) {
-    // 5xx, or a 400 (for example a retired model name or no credits left)
+    // Workers AI failed twice: out of capacity, or a retired model name in AI_MODEL
     return json({ error: 'AI service unavailable', forwarded }, 502, cors);
   }
   console.error('Unexpected error:', err?.message ?? err);
@@ -287,7 +276,8 @@ export default {
       return json({
         ok: true,
         service: 'fall-hike-ai',
-        apiKeyConfigured: Boolean(env.XAI_API_KEY),
+        aiConfigured: Boolean(env.AI),
+        model: env.AI_MODEL || DEFAULT_MODEL,
         alertsConfigured: Boolean(env.NTFY_TOPIC),
       }, 200);
     }
@@ -326,8 +316,8 @@ export default {
       return json({ error: `Question is too long (max ${MAX_QUESTION_CHARS} characters)` }, 400, cors);
     }
 
-    if (!env.XAI_API_KEY) {
-      console.error('XAI_API_KEY is not set. Add it as a secret in the Worker settings.');
+    if (!env.AI) {
+      console.error('The Workers AI binding is missing. Check [ai] in wrangler.toml.');
       const forwarded = alertOrganizer(env, ctx, question);
       return json({ error: 'AI service is misconfigured', forwarded }, 500, cors);
     }

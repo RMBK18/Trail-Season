@@ -3,7 +3,7 @@
 Every question in the Ask tab goes through three steps:
 
 1. **Fixed answers.** The app's offline FAQ answers from the hike plan. No network, no cost.
-2. **AI, only from your plan.** Anything else comes to this Worker. Grok (xAI) may answer **only**
+2. **AI, only from your plan.** Anything else comes to this Worker. Cloudflare Workers AI may answer **only**
    from the facts in `js/data.js`, and must quote the exact lines it used. The Worker checks
    every quote against the plan and throws the answer away if any quote doesn't match.
 3. **Unanswered → Summan.** If there's no verified answer, Summan gets a push alert (ntfy), and
@@ -13,29 +13,29 @@ Every question in the Ask tab goes through three steps:
 Phone ──question──▶ 1. Offline FAQ ──match──▶ answer
                          │ no match
                          ▼
-                    2. This Worker ──▶ Grok (plan facts only) ──▶ quote check ──pass──▶ "Live answer"
+                    2. This Worker ──▶ Workers AI (plan facts only) ──▶ quote check ──pass──▶ "Live answer"
                          │ not in the plan / check failed / error
                          ▼
                     3. Push alert to Summan  +  "Send to Summan" button for the asker
 ```
 
 - **Code:** `src/index.js`. The hike facts come from `../../js/data.js`, the same file the app uses.
-- **AI:** xAI's Grok API, model `grok-4.3` (about $1.25 / $2.50 per million input / output tokens).
-  To change the model, edit `XAI_MODEL` in `wrangler.toml` and redeploy.
+- **AI:** Cloudflare Workers AI (`[ai]` binding in `wrangler.toml`), model
+  `@cf/meta/llama-3.3-70b-instruct-fp8-fast`. It runs inside Cloudflare, so there is **no AI key**.
+  To change the model, edit `AI_MODEL` in `wrangler.toml` (it must support JSON Mode) and redeploy.
 - **Security:** the API key lives only in Cloudflare as a secret. Only `https://rmbk18.github.io`
   may call the Worker, and each visitor can ask 10 questions per minute.
 - **Stateless:** the Worker stores and logs no questions or answers. Unanswered questions are
   passed straight to your ntfy alert and not kept anywhere.
 - **Cost:** well under a cent per question that reaches the AI. Questions the offline FAQ answers
-  cost nothing. xAI gives new accounts free starter credits, which cover a small group easily.
+  cost nothing. Cloudflare's free daily allowance (10,000 Neurons, reset at midnight UTC) covers
+  about 125 AI questions a day. Past that, on the free plan the AI pauses until the next day and
+  questions go to Summan instead.
 
 ## 1. Deploy
 
 You need:
 
-- An **xAI API key**: [console.x.ai](https://console.x.ai) → sign in → **API Keys** → **Create API key**.
-  Check your credits there too. Leave xAI's optional "data sharing" program off: it lets xAI
-  train on the questions your friends ask.
 - A free **Cloudflare account**: [dash.cloudflare.com/sign-up](https://dash.cloudflare.com/sign-up).
 - **Node.js 22 or newer** for option A: [nodejs.org](https://nodejs.org).
 
@@ -48,7 +48,6 @@ npm install
 
 npx wrangler login                        # opens a browser to sign in to Cloudflare
 npx wrangler deploy                       # first deploy; prints your Worker URL
-npx wrangler secret put XAI_API_KEY       # paste the key when asked (it's hidden)
 npx wrangler secret put NTFY_TOPIC        # your private alert channel name (see "Alerts" below)
 ```
 
@@ -59,9 +58,12 @@ npx wrangler secret put NTFY_TOPIC        # your private alert channel name (see
    https://fall-hike-ai.<your-subdomain>.workers.dev
    ```
    **Copy this URL.** You'll paste it into `js/config.js`.
-3. `wrangler secret put XAI_API_KEY` stores the key encrypted in Cloudflare.
+3. `wrangler secret put NTFY_TOPIC` stores your alert channel name encrypted in Cloudflare.
    It never goes into git or into the app.
-4. `wrangler secret put NTFY_TOPIC` stores your alert channel name the same way.
+
+Without a browser (for example from a cloud session), skip `wrangler login` and set the
+`CLOUDFLARE_API_TOKEN` environment variable to a Cloudflare API token made from the
+**Edit Cloudflare Workers** template.
 
 ### Option B: from the Cloudflare dashboard (no Node.js needed)
 
@@ -70,8 +72,7 @@ npx wrangler secret put NTFY_TOPIC        # your private alert channel name (see
 3. Set the project name to **`fall-hike-ai`** (it must match `name` in `wrangler.toml`) and the
    **root directory** (under advanced/build settings) to **`phase2/ai-worker`**. Deploy.
 4. Open the Worker → **Settings** → **Variables and Secrets** → **Add**. Type **Secret**,
-   name `XAI_API_KEY`, value = your key. Add a second secret named `NTFY_TOPIC` with your
-   alert channel name (see "Alerts" below). Save (this redeploys).
+   name `NTFY_TOPIC`, value = your alert channel name (see "Alerts" below). Save (this redeploys).
 5. The URL is shown on the Worker's overview page (also under Settings → Domains & Routes).
 
 With option B, every push to `main` redeploys the Worker automatically.
@@ -91,10 +92,10 @@ Anyone who knows the name can read the alerts, so keep it random and private. Wi
 
 | Name | Where it's set | Value |
 |---|---|---|
-| `XAI_API_KEY` | Secret: `npx wrangler secret put XAI_API_KEY` or dashboard → Variables and Secrets | Your xAI key, `xai-...` |
 | `NTFY_TOPIC` | Secret: `npx wrangler secret put NTFY_TOPIC` or dashboard → Variables and Secrets | Your private ntfy channel name |
 | `ALLOWED_ORIGIN` | `[vars]` in `wrangler.toml` | `https://rmbk18.github.io` |
-| `XAI_MODEL` | `[vars]` in `wrangler.toml` | `grok-4.3` |
+| `AI_MODEL` | `[vars]` in `wrangler.toml` | `@cf/meta/llama-3.3-70b-instruct-fp8-fast` |
+| `AI` | `[ai]` binding in `wrangler.toml` | Workers AI (no key) |
 
 `ALLOWED_ORIGIN` is the site's origin only: `https://rmbk18.github.io`, **not**
 `https://rmbk18.github.io/Trail-Season/`. For more than one origin, separate them with commas.
@@ -132,10 +133,11 @@ it opens the app online. If it doesn't, close the app fully and open it again.
 **In a browser:** open the Worker URL. You should see:
 
 ```json
-{"ok":true,"service":"fall-hike-ai","apiKeyConfigured":true,"alertsConfigured":true}
+{"ok":true,"service":"fall-hike-ai","aiConfigured":true,"model":"@cf/meta/llama-3.3-70b-instruct-fp8-fast","alertsConfigured":true}
 ```
 
-This doesn't call the AI. `false` for either one means that secret isn't set.
+This doesn't call the AI. `"aiConfigured":false` means the `[ai]` binding is missing;
+`"alertsConfigured":false` means the `NTFY_TOPIC` secret isn't set.
 
 **Test script** (from `phase2/ai-worker`):
 
@@ -150,13 +152,13 @@ must be refused as off topic:
 
 ```
 PASS  Worker is live
-PASS  XAI_API_KEY secret is set
+PASS  Workers AI is connected
 PASS  CORS preflight allows the app  (status 204, allow-origin https://rmbk18.github.io)
 PASS  Other origins are blocked  (status 403)
 PASS  Empty question is rejected  (status 400)
 
 PASS  "I have bad knees, which hike should I pick?"  (200, 3.1s)
-      → (Grok's answer, or "unanswered (alert sent to the organizer)")
+      → (the AI's answer, or "unanswered (alert sent to the organizer)")
 ```
 
 Ask your own question: `node test.mjs <url> "Can I bring my drone to Rattlesnake Point?"`
@@ -181,8 +183,8 @@ curl -X POST https://fall-hike-ai.<your-subdomain>.workers.dev \
 | Are there bears at Short Hills? | Not in the plan: "I've passed it on to Summan" + **Send to Summan**, and you get an alert |
 | Write me a poem about cats | "I can only help with the fall hikes." (no alert) |
 
-**Local testing** (optional): create `phase2/ai-worker/.dev.vars` (git-ignored) containing
-`XAI_API_KEY=xai-...`, then run `npx wrangler dev` and `node test.mjs http://localhost:8787`.
+**Local testing** (optional): after `npx wrangler login`, run `npx wrangler dev` (Workers AI calls
+go to Cloudflare, counting toward the free allowance) and `node test.mjs http://localhost:8787`.
 
 **Live logs:** `npx wrangler tail` shows errors as they happen. Questions are never logged.
 
@@ -191,11 +193,11 @@ curl -X POST https://fall-hike-ai.<your-subdomain>.workers.dev \
 | Symptom | Cause and fix |
 |---|---|
 | App always says "ask Summan!" for new questions | `aiEndpoint` is still `null`, or phones have the old cached `config.js`. Bump `VERSION` in `sw.js`, push, then fully close and reopen the app. |
-| Worker URL shows `"apiKeyConfigured":false` | Secret missing. Add `XAI_API_KEY` in the Worker's Variables and Secrets. |
+| Worker URL shows `"aiConfigured":false` | The `[ai]` binding is missing from `wrangler.toml`, or the Worker was deployed without it. Redeploy. |
 | `403 Origin not allowed` | `ALLOWED_ORIGIN` must be exactly `https://rmbk18.github.io` (no path). curl and scripts must send an `Origin` header. |
 | `500 AI service is misconfigured` | The key is wrong, revoked or unset. Create a new key and run `secret put` again. |
-| `429 Too many questions` | The 10-per-minute limit, or your xAI account's rate limit. Wait a minute, or raise `limit` in `wrangler.toml`. |
-| `502 AI service unavailable` | xAI is down, your credits ran out (check console.x.ai), or the model in `XAI_MODEL` was retired. `npx wrangler tail` shows xAI's error message. |
+| `429 Too many questions` | The 10-per-minute limit, Workers AI's own rate limit, or the free daily AI allowance is used up (it resets at midnight UTC). Wait, or raise `limit` in `wrangler.toml` for the first case. |
+| `502 AI service unavailable` | Workers AI is busy, or the model in `AI_MODEL` was retired. `npx wrangler tail` shows the error. |
 | `504` or the app gives up | The answer took over 12 s. The app waits 15 s, then falls back to "ask Summan!". Try again. |
 | No ntfy alerts arrive | `alertsConfigured` is `false` (set the `NTFY_TOPIC` secret), or the name in the app doesn't exactly match the secret. Off-topic questions never send alerts. |
 | AI says it doesn't know something the plan covers | By design it answers only when it can quote the plan exactly. Add or reword the fact in `js/data.js` (or ask Summan to), then redeploy. |
@@ -207,7 +209,7 @@ curl -X POST https://fall-hike-ai.<your-subdomain>.workers.dev \
 
 - **Offline FAQ first.** `js/app.js` only calls the Worker when the offline FAQ has no match, so
   the AI never duplicates an FAQ answer and FAQ questions cost nothing.
-- **Only your facts.** Grok gets the facts from `js/data.js` and nothing else, is told not to
+- **Only your facts.** The AI gets the facts from `js/data.js` and nothing else, is told not to
   use general knowledge, and replies in a fixed format: `answered` (with quotes), `not_in_plan`
   or `off_topic`. An answer is shown only if every quote is found word for word in the plan.
   The quote check stops answers with no basis in the plan. It can't prove every word of an
