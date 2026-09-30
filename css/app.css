@@ -53,29 +53,30 @@
     --forest: #14291d;
     --forest-deep: #0d1c13;
     --forest-mid: #20412e;
-    --bg: #101913;
-    --surface: #18241c;
-    --surface-2: #1f2e24;
-    --ink: #f1e7d6;
-    --ink-2: #b3a38c;
-    --line: #2a3b30;
+    --bg: #101813;
+    --surface: #17221b;
+    --surface-2: #223127;
+    --ink: #f4f0e6;
+    --ink-2: #c7cabe;
+    --line: #36483c;
     --line-strong: #43584a;
-    --action: #b5501f;
-    --action-press: #9a431a;
-    --link: #eb9a68;
-    --icon: #93c4a1;
-    --amber-line: #e4a338;
+    --action: #f28b59;
+    --action-press: #d8602f;
+    --link: #f28b59;
+    --icon: #a9cda8;
+    --amber-line: #e7a62b;
     --warn-bg: #3a2016;
     --warn-ink: #f6c8a6;
     --warn-line: #5b3322;
     --time-bg: #372a12;
     --time-ink: #f3d596;
     --time-line: #5a4519;
-    --tab-bg: rgba(20, 31, 24, 0.9);
-    --shadow: 0 1px 0 rgba(0, 0, 0, 0.3), 0 8px 20px -12px rgba(0, 0, 0, 0.8);
+    --tab-bg: rgba(23, 34, 27, 0.9);
+    --shadow: 0 18px 50px rgba(0, 0, 0, .28);
     --heading: var(--ink);
   }
 }
+
 
 /* ── Base ─────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; }
