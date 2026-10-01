@@ -7,11 +7,15 @@
 // they open the app with a connection.
 // ─────────────────────────────────────────────────────────────
 
-const VERSION = 'fall-hike-2026-10-v18';
+const VERSION = 'fall-hike-2026-10-v19';
+
+// The app shell is cached as './', never './index.html': Cloudflare Pages
+// redirects /index.html to /, and Chrome won't open a page from a redirected
+// response ("This site can't be reached").
+const SHELL = './';
 
 const ASSETS = [
-  './',
-  './index.html',
+  SHELL,
   './manifest.json',
   './css/app.css',
   './js/app.js',
@@ -42,6 +46,11 @@ const ASSETS = [
   './fonts/libre-baskerville-italic.woff2',
 ];
 
+// Copy a redirected response into a plain one, so it can answer a page load.
+const unredirect = (res) => (res && res.redirected
+  ? res.blob().then((body) => new Response(body, { status: res.status, statusText: res.statusText, headers: res.headers }))
+  : res);
+
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(VERSION)
@@ -67,9 +76,9 @@ self.addEventListener('fetch', (event) => {
   // Page loads (any path or hash inside the app): serve the cached shell.
   if (req.mode === 'navigate') {
     event.respondWith(
-      caches.match('./index.html', { cacheName: VERSION })
-        .then((cached) => cached || fetch(req))
-        .catch(() => caches.match('./index.html')),
+      caches.match(SHELL, { cacheName: VERSION })
+        .then((cached) => (cached ? unredirect(cached) : fetch(req)))
+        .catch(() => caches.match(SHELL).then(unredirect)),
     );
     return;
   }
