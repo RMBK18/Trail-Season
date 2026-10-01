@@ -1,4 +1,10 @@
 # Trail-Season
+
+**App link: https://fallhike.pages.dev** (the old link, https://rmbk18.github.io/Trail-Season/, still works).
+
+After merging changes to `main`, publish them to the app link with `./deploy-site.sh`
+(needs `CLOUDFLARE_API_TOKEN`). The old GitHub Pages link updates by itself.
+
 Plan your perfect fall hike, offline A PWA for discovering and planning scenic autumn trails. Map routes, save favorites, track conditions, and navigate without cell service. Built for hikes who love fall foliage as much as fresh air.
 
 ## Phase 2: live AI answers
