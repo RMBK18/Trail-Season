@@ -23,8 +23,8 @@ Phone ──question──▶ 1. Offline FAQ ──match──▶ answer
 - **AI:** Cloudflare Workers AI (`[ai]` binding in `wrangler.toml`), model
   `@cf/meta/llama-3.3-70b-instruct-fp8-fast`. It runs inside Cloudflare, so there is **no AI key**.
   To change the model, edit `AI_MODEL` in `wrangler.toml` (it must support JSON Mode) and redeploy.
-- **Security:** the API key lives only in Cloudflare as a secret. Only `https://rmbk18.github.io`
-  may call the Worker, and each visitor can ask 10 questions per minute.
+- **Security:** only the app's own sites (`https://fallhike.pages.dev` and the old
+  `https://rmbk18.github.io`) may call the Worker, and each visitor can ask 10 questions per minute.
 - **Stateless:** the Worker stores and logs no questions or answers. Unanswered questions are
   passed straight to your ntfy alert and not kept anywhere.
 - **Cost:** well under a cent per question that reaches the AI. Questions the offline FAQ answers
@@ -93,7 +93,7 @@ Anyone who knows the name can read the alerts, so keep it random and private. Wi
 | Name | Where it's set | Value |
 |---|---|---|
 | `NTFY_TOPIC` | Secret: `npx wrangler secret put NTFY_TOPIC` or dashboard → Variables and Secrets | Your private ntfy channel name |
-| `ALLOWED_ORIGIN` | `[vars]` in `wrangler.toml` | `https://rmbk18.github.io` |
+| `ALLOWED_ORIGIN` | `[vars]` in `wrangler.toml` | `https://fallhike.pages.dev,https://rmbk18.github.io` |
 | `AI_MODEL` | `[vars]` in `wrangler.toml` | `@cf/meta/llama-3.3-70b-instruct-fp8-fast` |
 | `AI` | `[ai]` binding in `wrangler.toml` | Workers AI (no key) |
 

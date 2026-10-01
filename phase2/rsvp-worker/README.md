@@ -42,7 +42,7 @@ openssl rand -base64 48 | tr -d '\n' | npx wrangler secret put ADMIN_SECRET
 |---|---|---|
 | `NTFY_TOPIC` | Secret | Your private ntfy channel: an alert for every reply. Use the same channel as the AI Worker. |
 | `ADMIN_SECRET` | Secret | Any long random text. Signs the **Remove reply** links in alerts, so nobody else can make one. |
-| `ALLOWED_ORIGIN` | `[vars]` in `wrangler.toml` | `https://rmbk18.github.io` (origin only, no path) |
+| `ALLOWED_ORIGIN` | `[vars]` in `wrangler.toml` | `https://fallhike.pages.dev,https://rmbk18.github.io` (origins only, no path) |
 | `APP_URL` | `[vars]` in `wrangler.toml` | The app's address, for the **Open hike** button in alerts |
 
 Then set `rsvpEndpoint` in `js/config.js` to the Worker URL and bump `VERSION` in `sw.js`.

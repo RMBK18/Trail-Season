@@ -6,10 +6,11 @@ main = "src/index.js"
 compatibility_date = "2026-09-01"
 
 [vars]
-# Only the app's own site may call this Worker (comma-separate to add more,
+# Only the app's own sites may call this Worker: the main link (fallhike.pages.dev)
+# and the old GitHub Pages link, which still works. Comma-separate to add more,
 # e.g. "https://rmbk18.github.io,http://localhost:8000" for local testing).
 # Origins have no path: NOT https://rmbk18.github.io/Trail-Season/
-ALLOWED_ORIGIN = "https://rmbk18.github.io"
+ALLOWED_ORIGIN = "https://fallhike.pages.dev,https://rmbk18.github.io"
 
 # The Workers AI model to use (must support JSON Mode). Change it here if
 # Cloudflare retires it.

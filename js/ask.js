@@ -413,7 +413,7 @@ function answerFromPlan(raw, now) {
   if (!strong.length) {
     if (hikes.length) return { matched: true, html: hikes.slice(0, 2).map(overview).join('<hr>') };
     if (weak.includes('schedule')) return { matched: true, html: schedule() };
-    if (weak.includes('greeting')) return { matched: true, html: `<p>Hi! Ask me about meeting times, fees and booking, dogs, difficulty, drive times, washrooms or what to bring.</p>` };
+    if (weak.includes('greeting')) return { matched: true, html: `<p>Hi, I'm Scout! Ask me about meeting times, fees and booking, dogs, difficulty, drive times, washrooms or what to bring.</p>` };
     if (weak.includes('thanks')) return { matched: true, html: `<p>Anytime. See you on the trail 🍂</p>` };
     return { html: dontKnow(), matched: false };
   }

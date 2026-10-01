@@ -211,6 +211,7 @@ function renderHome() {
       <p class="canopy-eyebrow">${esc(APP.name)}</p>
       <h1 class="large-title">${taglineHTML(APP.tagline || APP.name)}</h1>
       <p class="canopy-sub">${esc(APP.intro || 'Five Saturdays near Toronto, Oct 3 to Oct 31')}</p>
+      <a class="scout-cta" href="#/ask">${I.ask}<span><b>Got a question? Ask Scout.</b><small>Times, fees, parking, trails: it knows the whole plan.</small></span>${I.chevR}</a>
       ${APP.chips ? `<div class="glass-chips">${APP.chips.map((c) => `<span class="glass-chip">${esc(c)}</span>`).join('')}</div>` : ''}
       ${signHTML(now, allHikes)}
     </header>
@@ -589,6 +590,21 @@ function kidsRow(h) {
   return `<li class="amen">${I.users}<div><b>Kids</b><span>${esc(KIDS_LABELS[h.kids] + '.' + tip + (h.kidsNote ? ' ' + h.kidsNote : ''))}</span></div></li>`;
 }
 
+// The Drive and Fee tiles at the top of a hike are buttons: Drive opens directions,
+// Fee opens booking (or, with nothing to book, jumps to the fee details).
+const factCta = (text, icon) => `<span class="fact-cta">${esc(text)}${icon}</span>`;
+
+const driveTile = (h) =>
+  `<a class="fact fact-link" href="${esc(mapsUrl(h.maps))}" target="_blank" rel="noopener" aria-label="Drive ${esc(h.drive.short)}. Directions in Google Maps">` +
+  `${I.car}<span class="fact-k">Drive</span><span class="fact-v">${esc(h.drive.short)}</span>${factCta('Directions', I.ext)}</a>`;
+
+function feeTile(h) {
+  const inner = `${I.ticket}<span class="fact-k">Fee</span><span class="fact-v">${esc(h.fee.amount).replace('/', '/<wbr>')}</span>`;
+  return h.booking
+    ? `<a class="fact fact-link" href="${esc(h.booking.url)}" target="_blank" rel="noopener" aria-label="Fee ${esc(h.fee.amount)}. ${esc(h.booking.label)}">${inner}${factCta(h.booking.cta || 'Book', I.ext)}</a>`
+    : `<button class="fact fact-link" type="button" data-scroll-to="fees" aria-label="Fee ${esc(h.fee.amount)}. See fee details">${inner}${factCta('Details', I.chevR)}</button>`;
+}
+
 function renderDetail(h) {
   const v = $('#view-detail');
   const washroomRow = h.noWashrooms
@@ -617,8 +633,8 @@ function renderDetail(h) {
     <div class="detail-body">
       <div class="facts">
         <div class="fact">${I.clock}<span class="fact-k">Meet</span><span class="fact-v">${esc(h.meet.time)}</span></div>
-        <div class="fact">${I.car}<span class="fact-k">Drive</span><span class="fact-v">${esc(h.drive.short)}</span></div>
-        <div class="fact">${I.ticket}<span class="fact-k">Fee</span><span class="fact-v">${esc(h.fee.amount).replace('/', '/<wbr>')}</span></div>
+        ${driveTile(h)}
+        ${feeTile(h)}
       </div>
 
       ${alertsHTML(h)}
@@ -651,18 +667,16 @@ function renderDetail(h) {
         <ul class="tags">${h.highlights.map((x) => `<li>${I.leaf}${esc(x)}</li>`).join('')}</ul>
       </section>
 
-      <section class="block">
+      <section class="block block-fees" id="fees">
         <h2>Fees and booking</h2>
         <p class="lead"><b>${esc(h.fee.amount)}</b></p>
         <p>${esc(h.fee.note)}</p>
-        ${h.booking ? `<a class="btn btn-primary" href="${esc(h.booking.url)}" target="_blank" rel="noopener">${I.ext}<span>${esc(h.booking.label)}</span></a><p class="fine">${esc(h.booking.host)}</p>` : ''}
       </section>
 
       <section class="block">
         <h2>Getting there</h2>
         <p class="lead">Drive: <b>${esc(h.drive.text)}</b></p>
         ${road ? `<div class="alert alert-road inline">${I.route}<div><b>${esc(road.title)}</b><span>${esc(road.text)}</span></div></div>` : ''}
-        <a class="btn btn-secondary" href="${esc(mapsUrl(h.maps))}" target="_blank" rel="noopener">${I.pin}<span>Directions in Google Maps</span></a>
       </section>
 
       <section class="block">
@@ -713,22 +727,22 @@ function renderDetail(h) {
 // ASK TAB
 // ═════════════════════════════════════════════════════════════
 // Ask and Share headers: a photo band like the home screen
-function barHTML(title, photo) {
+function barHTML(title, photo, eyebrow = APP.name) {
   return `<header class="bar${photo ? ' has-photo' : ''}">
     ${photo ? `<img class="bar-photo" src="${esc(photo.src)}" alt="" decoding="async">` : ''}
-    <p class="bar-eyebrow">${esc(APP.name)}</p>
+    <p class="bar-eyebrow">${esc(eyebrow)}</p>
     <h1 class="bar-title">${esc(title)}</h1>
   </header>`;
 }
 
 function renderAsk() {
   $('#view-ask').innerHTML = `
-    ${barHTML('Ask', APP.photo)}
+    ${barHTML('Scout', APP.photo, 'Your hike assistant')}
     <div class="chat" id="chat" aria-live="polite">
       <div class="welcome">
         <span class="welcome-icon" aria-hidden="true">${I.leaf}</span>
-        <h2 class="welcome-h">Questions about the hikes?</h2>
-        <p>Ask about meeting times, fees and booking, dogs, difficulty, drive times, washrooms or what to bring.</p>
+        <h2 class="welcome-h">Hi, I'm Scout</h2>
+        <p>Ask me anything about the hikes: meeting times, fees and booking, dogs, difficulty, drive times, washrooms or what to bring.</p>
         <p class="msg-fine">Answers come from the hike plan and work offline.</p>
         <p class="welcome-try">Try asking</p>
         <div class="welcome-qs">${SUGGESTIONS.slice(0, 4).map((s) => `<button class="chip-q" type="button" data-suggest="${esc(s)}">${esc(s)}</button>`).join('')}</div>
@@ -736,8 +750,8 @@ function renderAsk() {
     </div>
     <div class="chips" role="list">${SUGGESTIONS.map((s) => `<button class="chip-q" type="button" role="listitem" data-suggest="${esc(s)}">${esc(s)}</button>`).join('')}</div>
     <form class="composer" id="ask-form" autocomplete="off">
-      <label for="ask-input" class="sr-only">Your question</label>
-      <input id="ask-input" name="q" type="text" inputmode="text" enterkeyhint="send" maxlength="300" placeholder="e.g. Can I bring my dog on Oct 10?">
+      <label for="ask-input" class="sr-only">Your question for Scout</label>
+      <input id="ask-input" name="q" type="text" inputmode="text" enterkeyhint="send" maxlength="300" placeholder="Ask Scout anything…">
       <button class="send" type="submit" aria-label="Send">${I.send}</button>
     </form>`;
 }
@@ -1133,6 +1147,10 @@ document.addEventListener('click', async (e) => {
   }
   if (t.matches('[data-send-question]')) {
     sendQuestion(t.dataset.sendQuestion);
+    return;
+  }
+  if (t.matches('[data-scroll-to]')) {
+    $(`#${t.dataset.scrollTo}`)?.scrollIntoView({ block: 'start', behavior: reduceMotion() ? 'auto' : 'smooth' });
     return;
   }
   if (t.matches('[data-rsvp-pick], [data-rsvp-carpool]')) {
