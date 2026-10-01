@@ -7,7 +7,7 @@
 // they open the app with a connection.
 // ─────────────────────────────────────────────────────────────
 
-const VERSION = 'fall-hike-2026-10-v19';
+const VERSION = 'fall-hike-2026-10-v20';
 
 // The app shell is cached as './', never './index.html': Cloudflare Pages
 // redirects /index.html to /, and Chrome won't open a page from a redirected
@@ -20,6 +20,7 @@ const ASSETS = [
   './css/app.css',
   './js/app.js',
   './js/ask.js',
+  './js/carpool.js',
   './js/config.js',
   './js/data.js',
   './js/icons.js',
@@ -94,6 +95,39 @@ self.addEventListener('fetch', (event) => {
         }
         return res;
       });
+    }),
+  );
+});
+
+// ── Ride alerts (drivers who turned them on) ────────────────
+// The only notification the app ever shows: "🚗 Sara (Downtown) wants a ride
+// with you". Tapping it opens that hike's Rides list.
+self.addEventListener('push', (event) => {
+  let msg = {};
+  try { msg = event.data ? event.data.json() : {}; } catch { /* not JSON: show the plain title */ }
+  event.waitUntil(
+    self.registration.showNotification(msg.title || 'Fall Hike App', {
+      body: msg.body || '',
+      icon: './icons/icon-192.png',
+      tag: msg.tag || 'ride',
+      renotify: true,
+      data: { url: msg.url || './' },
+    }),
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const url = new URL(event.notification.data?.url || './', self.registration.scope).href;
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async (wins) => {
+      const win = wins.find((w) => w.url.startsWith(self.registration.scope));
+      if (win) {
+        await win.focus();
+        // Only a page this worker controls can be sent elsewhere; otherwise open a new one.
+        return win.navigate ? win.navigate(url).catch(() => self.clients.openWindow(url)) : self.clients.openWindow(url);
+      }
+      return self.clients.openWindow(url);
     }),
   );
 });

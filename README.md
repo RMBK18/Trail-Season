@@ -25,3 +25,15 @@ entries. Replies are kept by the Cloudflare Worker in
 [`phase2/rsvp-worker/`](phase2/rsvp-worker/README.md). It's on when `rsvpEndpoint` in
 `js/config.js` is set. Replies are deleted a week after each hike. Setup, tests and
 troubleshooting are in [`phase2/rsvp-worker/README.md`](phase2/rsvp-worker/README.md).
+
+## Carpool ("Rides")
+
+Drivers and riders find each other without Summan in the middle. Under the reply form, drivers
+(**I can drive**) and riders (**Need a ride**) pick the area they leave from and can share a
+WhatsApp number. Each hike page has a **Rides** list, with drivers from your area first:
+**Message** opens WhatsApp with a message already written, and **Ride with** saves a seat
+(seats left count down by themselves; **Cancel my seat** frees it). Drivers can turn on one
+kind of phone notification: "Sara (Downtown) wants a ride with you". Scout answers "how does
+carpooling work?" and shows the live drivers when someone says they need a ride. A banner on
+the Hikes screen tells everyone about it. Everything is deleted a week after each hike. Built
+into the same RSVP Worker; details in [`phase2/rsvp-worker/README.md`](phase2/rsvp-worker/README.md).

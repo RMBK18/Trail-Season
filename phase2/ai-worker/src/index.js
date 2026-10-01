@@ -10,8 +10,10 @@
 //      an ntfy push alert (if NTFY_TOPIC is set), and the app shows a
 //      "Send to Summan" button so the asker can send it and get a reply.
 //
-// Response: { "status": "answered", "answer": "..." }
+// Response: { "status": "answered", "answer": "...", "ride_help": true? }
 //        or { "status": "unanswered" | "off_topic", "forwarded": true|false }
+// ride_help: the person is looking for a ride. The app then shows its live
+// rides card from the RSVP list; the AI never sees names or phone numbers.
 // Errors keep a non-2xx status and also carry "forwarded".
 //
 // Stateless: questions and answers are never stored or logged here.
@@ -64,6 +66,19 @@ ${HIKES.map(hikeFacts).join('\n\n')}
 
 Every hike: ${BASICS.join(', ')}.
 
+CARPOOLING (the Rides list on each hike page of the app)
+- To offer a ride: open the hike, reply Coming, pick I can drive, set your spare seats and pick your area.
+- To get a ride: open the hike, reply Coming, pick Need a ride and pick your area. Drivers from your area are listed first.
+- Tap Message to open WhatsApp with a message already written, or Ride with to save a seat in a driver's car. The seats left go down by themselves, and a full car shows Full.
+- Only one of the two people needs to share a WhatsApp number: whoever has the other's number sends the first message, and they sort out the pickup time and place between them.
+- Sharing a WhatsApp number is optional. There are no logins, so anyone with the app link can see a shared number when they tap Message.
+- Riders can cancel their seat any time with Cancel my seat. Drivers can't remove riders; they sort it out on WhatsApp and the rider cancels.
+- People coming with you need seats too.
+- Drivers can turn on ride alerts: one notification each time someone taps Ride with them, and no other notifications. On iPhone, alerts need the app added to the Home Screen (iOS 16.4 or later).
+- If a driver stops driving, their riders lose their seats and see a notice in the app.
+- Numbers, areas, seats and ride alerts are deleted a week after each hike.
+- Areas to pick from: Downtown, Etobicoke, North York, Scarborough, Markham, Vaughan, Mississauga, Brampton, Oakville, Milton, Burlington, Hamilton, Waterloo, or Other.
+
 GROUP RULES AND TIPS
 - Rain: ${GROUP.rain}
 - Carpools: ${GROUP.carpool}
@@ -79,10 +94,12 @@ The app's offline FAQ has already tried the question and found no match, so ques
 
 Answer ONLY from THE FACTS below. They are everything ${APP.askPerson} has written down. Do not use general knowledge, outside facts, or guesses, even about well-known parks. Do not add advice, details or reassurance that THE FACTS don't state.
 
-Reply with only a JSON object of this shape: {"status": "...", "answer": "...", "quotes": ["..."]}
+Reply with only a JSON object of this shape: {"status": "...", "answer": "...", "quotes": ["..."], "ride_help": false}
 - status "answered": THE FACTS fully answer the question. Put a friendly, plain-text answer of 1 or 2 short sentences in "answer" (no markdown). In "quotes", copy the exact phrases from THE FACTS that support every fact in your answer, word for word. The app checks each quote against THE FACTS and discards the answer if any quote doesn't match.
 - status "not_in_plan": the question is about the hikes, the trip or hiking, but THE FACTS don't fully answer it. Leave "answer" empty and "quotes" empty. ${APP.askPerson} will answer it personally. When in doubt, choose this.
 - status "off_topic": the question has nothing to do with the hikes or the trip. Leave "answer" and "quotes" empty.
+
+Set "ride_help" to true only when the person is looking for a ride, a lift, a driver or a free seat to a hike (for example "can anyone pick me up from Markham?" or "is anyone driving from Brampton on Saturday?"). The app then shows them its live list of drivers. You never see that list, so never name drivers, never say whether seats are free, and answer from CARPOOLING (for example how to save a seat). Otherwise set "ride_help" to false.
 
 You may use today's date to work out which hike is next or how far away a date is.
 
@@ -98,8 +115,9 @@ const ANSWER_FORMAT = {
       status: { type: 'string', enum: ['answered', 'not_in_plan', 'off_topic'] },
       answer: { type: 'string' },
       quotes: { type: 'array', items: { type: 'string' } },
+      ride_help: { type: 'boolean' },
     },
-    required: ['status', 'answer', 'quotes'],
+    required: ['status', 'answer', 'quotes', 'ride_help'],
     additionalProperties: false,
   },
 };
@@ -234,22 +252,29 @@ function readReply(result) {
   }
 }
 
-// Returns { status: 'answered', answer } | { status: 'unanswered' } | { status: 'off_topic' }
+// When someone wants a ride and the AI's own answer didn't check out, this is said
+// instead; the app shows the live drivers under it.
+const RIDE_HELP_ANSWER = 'Here are the drivers for the hike. Tap Ride with to save a seat, or Message to WhatsApp a driver.';
+
+// Returns { status: 'answered', answer, rideHelp? } | { status: 'unanswered' } | { status: 'off_topic' }
 async function askAI(env, question) {
   const out = readReply(await runModel(env, question));
   if (!out) {
     console.error('Unreadable reply from the AI');
     return { status: 'unanswered' };
   }
-  if (out.status === 'off_topic') return { status: 'off_topic' };
-  if (out.status !== 'answered') return { status: 'unanswered' };
+  const rideHelp = out.ride_help === true;
+  if (out.status === 'off_topic' && !rideHelp) return { status: 'off_topic' };
+  if (out.status !== 'answered' && !rideHelp) return { status: 'unanswered' };
 
   const answer = trimAnswer(String(out.answer || ''));
   if (!answer || !quotesCheckOut(out.quotes)) {
+    // A ride request is answered by the app's live rides card, so it never goes to the organizer.
+    if (rideHelp) return { status: 'answered', answer: RIDE_HELP_ANSWER, rideHelp };
     console.warn('Answer discarded: quotes did not match the facts');
     return { status: 'unanswered' };
   }
-  return { status: 'answered', answer };
+  return { status: 'answered', answer, rideHelp };
 }
 
 // Map AI problems to what the app should get back. The app treats any
@@ -327,7 +352,9 @@ export default {
 
     try {
       const result = await askAI(env, question);
-      if (result.status === 'answered') return json({ status: 'answered', answer: result.answer }, 200, cors);
+      if (result.status === 'answered') {
+        return json({ status: 'answered', answer: result.answer, ...(result.rideHelp ? { ride_help: true } : {}) }, 200, cors);
+      }
       if (result.status === 'off_topic') return json({ status: 'off_topic', forwarded: false }, 200, cors);
       const forwarded = alertOrganizer(env, ctx, question);
       return json({ status: 'unanswered', forwarded }, 200, cors);

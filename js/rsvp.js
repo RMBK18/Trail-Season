@@ -11,6 +11,9 @@
 //                   so only this phone can change its own replies.
 //   fh:rsvps        the last lists seen, so the page works with no signal
 //   fh:rsvp-outbox  replies made with no signal; sent when the phone is back online
+//
+// Carpool: saving a seat ("Ride with"), cancelling it, and drivers' ride alerts
+// need signal, so they're never queued.
 // ═════════════════════════════════════════════════════════════
 
 import { CONFIG } from './config.js';
@@ -90,7 +93,7 @@ async function request(method, path, body) {
 }
 
 // ── What this phone knows ───────────────────────────────────
-// cache = { at: last full refresh (ms), hikes: { [hikeId]: entry[] } }
+// cache = { at: last full refresh (ms), hikes: { [hikeId]: entry[] }, pushKey }
 let cache = read(CACHE_KEY, null) || { at: 0, hikes: {} };
 const listeners = new Set();
 const problemListeners = new Set();
@@ -127,14 +130,27 @@ function unqueue(hikeId) {
 /**
  * The list for one hike as this phone should show it: the last list seen,
  * with this phone's not-yet-sent reply (if any) put in place of its old one.
- * @returns {{ list: Array<{name:string,status:string,guests:number,carpool:string,seats:number,mine:boolean,pending?:boolean}>, at: number, pending: boolean }}
+ * Carpool fields: area, phone (shared numbers only), seatsLeft (drivers),
+ * ride (the driver a rider has a seat with); on my own entry, alerts and lostRide.
+ * @returns {{ list: Array<{name:string,status:string,guests:number,carpool:string,seats:number,mine:boolean,area?:string,phone?:string,seatsLeft?:number,ride?:string,alerts?:boolean,lostRide?:string,pending?:boolean}>, at: number, pending: boolean }}
  */
 export function listFor(hikeId) {
   let list = (cache.hikes[hikeId] || []).slice();
   const waiting = outbox()[hikeId];
   if (waiting) {
+    const old = list.find((e) => e.mine);
     list = list.filter((e) => !e.mine && !(waiting.claim && waiting.reply && e.name.toLocaleLowerCase() === waiting.reply.name.toLocaleLowerCase()));
-    if (waiting.reply) list.push({ ...waiting.reply, updatedAt: waiting.at, mine: true, pending: true });
+    if (waiting.reply) {
+      const r = waiting.reply;
+      const entry = { ...r, updatedAt: waiting.at, mine: true, pending: true };
+      if (!(r.carpool === 'driving' || r.carpool === 'need-ride') || r.status === 'cant') { delete entry.area; delete entry.phone; }
+      else if (!r.phone) delete entry.phone;
+      // Until it's sent, keep showing the seat or alerts this reply still allows.
+      if (old?.ride && r.status === 'coming' && r.carpool === 'need-ride') entry.ride = old.ride;
+      if (old?.alerts && r.status === 'coming' && r.carpool === 'driving') entry.alerts = true;
+      if (r.carpool === 'driving' && r.status === 'coming') entry.seatsLeft = old?.seatsLeft ?? r.seats;
+      list.push(entry);
+    }
   }
   return { list, at: cache.at, pending: Boolean(waiting) };
 }
@@ -159,7 +175,7 @@ export function refreshAll() {
     try {
       await flushOutbox();
       const data = await request('GET', '/rsvps');
-      cache = { at: Date.now(), hikes: data.hikes || {} };
+      cache = { at: Date.now(), hikes: data.hikes || {}, pushKey: data.pushKey || null };
       write(CACHE_KEY, cache);
       emit();
     } finally {
@@ -245,6 +261,40 @@ export async function setRsvp(hikeId, reply, { claim = false } = {}) {
     emit();
     return { sent: false, queued: true };
   }
+}
+
+/** The app's public key for ride alerts (from the last refresh), or null when alerts aren't set up. */
+export const pushKey = () => cache.pushKey || null;
+
+// ── Carpool: seats and ride alerts (need signal, never queued) ──
+async function live(hikeId, method, path, body) {
+  const data = await request(method, path, body);
+  if (data.list) {
+    setHike(hikeId, data.list);
+    emit();
+  }
+  return data;
+}
+
+/**
+ * Save a seat with a driver (or move my seat to them). My reply must be Coming + Need a ride.
+ * Resolves { change: 'new'|'switched'|'same', from, driverAlerted }. Rejects with RsvpError:
+ * 'car_full' (data.left), 'not_driving', 'no_driver', 'not_rider', 'network', …
+ */
+export function requestSeat(hikeId, driverName) {
+  return live(hikeId, 'PUT', `/rides/${hikeId}`, { driver: driverName });
+}
+
+/** Give up my seat (also clears a "your driver stopped driving" notice). */
+export function cancelSeat(hikeId) {
+  return live(hikeId, 'DELETE', `/rides/${hikeId}`);
+}
+
+/** Drivers: turn ride alerts on with this phone's PushSubscription, or off with null. */
+export function setRideAlerts(hikeId, subscription) {
+  return subscription
+    ? live(hikeId, 'PUT', `/push/${hikeId}`, subscription.toJSON ? subscription.toJSON() : subscription)
+    : live(hikeId, 'DELETE', `/push/${hikeId}`);
 }
 
 /** Remove this phone's reply. Resolves { sent: true } or, with no signal, { sent: false, queued: true }. */
