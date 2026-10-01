@@ -42,8 +42,8 @@
   ],
   "shortcuts": [
     {
-      "name": "Ask a question",
-      "short_name": "Ask",
+      "name": "Ask Scout",
+      "short_name": "Scout",
       "url": "./#/ask",
       "icons": [
         {

@@ -7,7 +7,7 @@
 // they open the app with a connection.
 // ─────────────────────────────────────────────────────────────
 
-const VERSION = 'fall-hike-2026-10-v17';
+const VERSION = 'fall-hike-2026-10-v18';
 
 const ASSETS = [
   './',

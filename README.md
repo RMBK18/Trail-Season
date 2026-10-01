@@ -9,7 +9,7 @@ Plan your perfect fall hike, offline A PWA for discovering and planning scenic a
 
 ## Phase 2: live AI answers
 
-The Ask tab works in three steps: (1) fixed answers from the hike plan, offline; (2) if none
+Scout (the Ask tab) works in three steps: (1) fixed answers from the hike plan, offline; (2) if none
 match, the Cloudflare Worker in [`phase2/ai-worker/`](phase2/ai-worker/README.md) asks Cloudflare Workers AI,
 which may answer only from the plan and must quote it; (3) anything still unanswered goes to
 Summan (a push alert, plus a "Send to Summan" button for the asker). To turn on step 2, deploy
