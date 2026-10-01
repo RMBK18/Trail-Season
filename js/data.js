@@ -42,7 +42,7 @@ export const KIDS_LABELS = { yes: 'Kid-friendly', 'easy-trail': 'Kid-friendly: e
 // advice, not from the hike plan: edit freely.
 export const GROUP = {
   rain: `We still go in light rain, so bring a rain jacket. If the weather looks bad, ${APP.askPerson} will post any change in the group chat the night before.`,
-  carpool: `Carpools are sorted in the group chat. Post there if you need a ride or have spare seats.`,
+  carpool: `Each hike page has a Rides list. Reply Coming, pick I can drive or Need a ride, and pick your area: riders see drivers from their area first. Tap Message to WhatsApp someone, or Ride with to save a seat in a driver's car; the seats left count down by themselves, and you can cancel your seat any time. Sharing your WhatsApp number is optional, and everything is deleted a week after the hike.`,
   kids: `Kids are welcome on the kid-friendly trails. Check each hike's difficulty and decide whether it suits your kids.`,
   swim: `No swimming on these hikes: they're group hikes, and the water is cold in October. Enjoy the rivers and falls from the trail.`,
   bikes: `Leave the bike at home: these are group hikes. Some of these parks allow bikes only on certain trails, so check the park's website before riding there another day.`,

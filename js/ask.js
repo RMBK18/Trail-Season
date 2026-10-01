@@ -6,8 +6,9 @@
 
 import { HIKES, BASICS, APP, GROUP } from './data.js';
 import { CONFIG } from './config.js';
-import { esc, mapsUrl, nextHike, torontoDateISO } from './lib.js';
+import { esc, mapsUrl, nextHike, torontoDateISO, endMs } from './lib.js';
 import { isRsvpLive, countsFor } from './rsvp.js';
+import { AREAS } from './carpool.js';
 
 export const DONT_KNOW = `I don't know that one — ask ${APP.askPerson}!`;
 export const FORWARDED = `I don't know that one yet, so I've passed it on to ${APP.askPerson}. To get a reply, send it yourself too:`;
@@ -17,7 +18,9 @@ export const SUGGESTIONS = [
   'What time do we meet on Oct 3?',
   'How much is Balls Falls?',
   'Can I bring my dog?',
+  'I need a ride',
   'Parking at Rouge Park?',
+  'How does carpooling work?',
   'How hard is Rattlesnake Point?',
   'What should I bring?',
   'How long is the drive to Dundas?',
@@ -60,6 +63,19 @@ const NAME_PHRASES = [
 ];
 
 const BACKUP_NAMES = ['mono cliffs', 'hilton falls', 'mount nemo', 'mt nemo', 'rock point', 'crawford lake', 'headwaters', 'monarch', 'glen rouge', 'dundas peak', 'tew falls', "tew's falls", 'tews falls', 'spencer gorge'];
+
+// Carpool: asking for a ride (show the live drivers) vs how it works
+const RIDE_WANTED = ['need a ride', 'need ride', 'get a ride', 'give me a ride', 'a lift', 'lift to', 'pick me up', 'drive me', 'any drivers', 'anyone driving', 'who is driving', "who's driving", 'whos driving', 'who can drive', 'can someone drive', 'can anyone drive', 'looking for a ride', 'no car', "don't have a car", 'dont have a car', 'without a car', "i don't drive", 'i dont drive', "i can't drive", 'i cant drive', 'spare seat', 'spare seats', 'empty seat', 'empty seats', 'free seat', 'free seats', 'seats left', 'rides'];
+const HOW_WORDS = /\b(how|work|works|explain|cancel|offer|alerts?|notifications?|notify|whatsapp|private|privacy|number|delete|deleted|remove)\b/;
+// "a ride from Scarborough": the area someone leaves from, not the Rouge hike
+const AREA_KEYS = AREAS.filter((a) => a.lat != null).map((a) => [a.name, a.name.toLowerCase()]);
+function rideArea(q) {
+  for (const [name, key] of AREA_KEYS) {
+    const m = new RegExp(`\\b(from|in|near|around|leaving|out of|live in|living in|based in|i'm in|im in)\\s+(the\\s+)?${key}\\b`).exec(q);
+    if (m) return { area: name, phrase: m[0] };
+  }
+  return null;
+}
 
 const ORDINALS = { first: 1, '1st': 1, second: 2, '2nd': 2, third: 3, '3rd': 3, fourth: 4, '4th': 4, fifth: 5, '5th': 5, last: 5, final: 5 };
 
@@ -119,7 +135,7 @@ function detectHikes(q, now) {
 const TOPICS = [
   { id: 'emergency', kws: ['emergency', '911', 'ambulance', 'injured', 'injury', 'accident', 'bleeding', 'broken leg', 'broken arm', 'broke my', 'sprained', "i'm lost", 'im lost', 'i am lost', 'we are lost', "we're lost", 'were lost', 'got lost'] },
   { id: 'cancel', kws: ['cancel', 'cancels', 'cancelled', 'canceled', 'cancellation', 'postpone', 'postponed', 'reschedule', 'rescheduled', 'rain or shine', 'rain date', 'rain plan', 'if it rains', "if it's raining", 'if its raining', 'in the rain', 'bad weather', 'still on', 'still happening', 'called off', 'call it off'] },
-  { id: 'carpool', kws: ['carpool', 'carpools', 'carpooling', 'car pool', 'rideshare', 'ride share', 'need a ride', 'get a ride', 'give me a ride', 'give a ride', 'a lift', 'who is driving', "who's driving", 'whos driving', 'spare seat', 'spare seats', 'empty seat', 'empty seats'] },
+  { id: 'carpool', kws: ['carpool', 'carpools', 'carpooling', 'car pool', 'rideshare', 'ride share', 'need a ride', 'need ride', 'get a ride', 'give me a ride', 'give a ride', 'a lift', 'lift to', 'who is driving', "who's driving", 'whos driving', 'spare seat', 'spare seats', 'empty seat', 'empty seats', 'free seat', 'free seats', 'my seat', 'a seat', 'seats left', 'pick me up', 'drive me', 'any drivers', 'anyone driving', 'who can drive', 'can someone drive', 'can anyone drive', 'looking for a ride', 'ride with', 'riding with', 'offer a ride', 'offer seats', 'offer rides', 'rides', 'whatsapp', 'ride alerts', 'no car', "don't have a car", 'dont have a car', 'without a car', "i don't drive", 'i dont drive', "i can't drive", 'i cant drive'] },
   { id: 'rsvp', kws: ['rsvp', 'who is coming', "who's coming", 'whos coming', 'who is going', "who's going", 'whos going', 'attending', 'sign up', 'signup', 'count me in', 'headcount', "i'm in", 'im in', 'how many people', 'how many of us', 'who else'] },
   { id: 'ticks', kws: ['tick', 'ticks', 'lyme'] },
   { id: 'kids', kws: ['kid', 'kids', 'child', 'children', 'toddler', 'toddlers', 'baby', 'babies', 'little one', 'little ones', 'son', 'daughter', 'family', 'families', 'family-friendly', 'family friendly'] },
@@ -333,7 +349,15 @@ const ANSWERS = {
   },
   carpool: {
     one: () => ANSWERS.carpool.all(),
-    all: () => `<p>${esc(GROUP.carpool)}</p>`,
+    all: () => (isRsvpLive()
+      ? `<p>Each hike page has a <b>Rides</b> list:</p>` + list([
+        'Reply <b>Coming</b>, pick <b>I can drive</b> or <b>Need a ride</b>, and your area.',
+        'Riders see drivers from their area first. Tap <b>Message</b> to WhatsApp a driver, or <b>Ride with</b> to save a seat. The seats left count down by themselves.',
+        'Only one of you needs to share a WhatsApp number: whoever has the other\'s number messages first, and you sort out pickup together.',
+        'Drivers can turn on 🔔 ride alerts: one notification when someone taps Ride with them, nothing else.',
+        'Plans changed? Tap <b>Cancel my seat</b> any time. If a driver stops driving, their riders are told.',
+      ]) + `<p>Sharing your number is optional, and everything is deleted a week after the hike.</p>`
+      : `<p>${esc(GROUP.carpool)}</p>`),
   },
   swim: { one: () => ANSWERS.swim.all(), all: () => `<p>${esc(GROUP.swim)}</p>` },
   bikes: { one: () => ANSWERS.bikes.all(), all: () => `<p>${esc(GROUP.bikes)}</p>` },
@@ -376,11 +400,25 @@ export function answer(raw, now = new Date()) {
   return { ...res, unsure: res.html.includes(esc(DONT_KNOW)) };
 }
 
+/**
+ * Which hike's rides to show for a ride question, and the area it mentions:
+ * the hike named in the question, else the next one. Null when the season is over.
+ */
+export function rideTarget(raw, now = new Date()) {
+  const q = norm(raw);
+  const ra = rideArea(q);
+  const { hikes } = detectHikes(ra ? q.replace(ra.phrase, ' ') : q, now);
+  const h = hikes.find((x) => now.getTime() <= endMs(x)) || nextHike(now);
+  return h ? { hikeId: h.id, area: ra?.area || '' } : null;
+}
+
 function answerFromPlan(raw, now) {
   const q = norm(raw);
   if (!q) return { html: '', matched: false };
 
-  const { hikes, badDate, none } = detectHikes(q, now);
+  // "A ride from Scarborough" names where they leave from, not the Scarborough hike.
+  const ra = rideArea(q);
+  const { hikes, badDate, none } = detectHikes(ra ? q.replace(ra.phrase, ' ') : q, now);
   const { strong, weak, offTopic, anyHardStrong } = detectTopics(q);
   if (strong.includes('emergency')) return { matched: true, html: ANSWERS.emergency.all() };
 
@@ -422,6 +460,30 @@ function answerFromPlan(raw, now) {
     return { matched: true, html: hikes.length ? ANSWERS.rsvp.one(hikes[0]) : ANSWERS.rsvp.all() };
   }
 
+  // Carpool: "I need a ride" shows the live drivers (the app draws the rides card from
+  // the RSVP list); "how does it work?" explains. Either way, other topics still answer.
+  if (strong.includes('carpool')) {
+    const wantsRide = RIDE_WANTED.some((k) => hasKw(q, k));
+    const howTo = !wantsRide || HOW_WORDS.test(q);
+    const target = wantsRide ? rideTarget(raw, now) : null;
+    const h = target && HIKES.find((x) => x.id === target.hikeId);
+    let html = howTo ? ANSWERS.carpool.all() : '';
+    let rides = null;
+    if (wantsRide && !h) html += `<p>The fall plan is finished, so there are no rides to find.</p>`;
+    else if (wantsRide && isRsvpLive()) {
+      rides = target;
+      if (!howTo) html += `<p>Here are the drivers for ${who(h)}${target.area ? `, nearest to ${esc(target.area)} first` : ''}. Tap <b>Ride with</b> to save a seat, or <b>Message</b> to WhatsApp a driver.</p>`;
+    }
+    // "Cancel my seat" is about the seat, not the hike being cancelled.
+    const rest = strong.filter((id) => id !== 'carpool' && !(id === 'cancel' && /\bseats?\b/.test(q)));
+    if (rest.length) {
+      html += hikes.length
+        ? hikes.map((x) => `<p class="ans-hike">${esc(x.dateShort)}: ${esc(x.park)}</p>` + rest.map((id) => ANSWERS[id].one(x)).join('')).join('<hr>')
+        : rest.map((id) => ANSWERS[id].all()).join('');
+    }
+    return { matched: true, html: html + tail, rides };
+  }
+
   if (!hikes.length) {
     return { matched: true, html: strong.map((id) => ANSWERS[id].all()).join('') + tail };
   }
@@ -444,11 +506,12 @@ function answerFromPlan(raw, now) {
 //
 // CONFIG.aiEndpoint must point at YOUR server (the Cloudflare Worker in /phase2/ai-worker/).
 // That server runs Cloudflare Workers AI, answers only from the hike plan, and
-// returns { status: 'answered', answer } or { status: 'unanswered' | 'off_topic',
-// forwarded } (forwarded = the organizer got an alert).
+// returns { status: 'answered', answer, ride_help? } or { status: 'unanswered' | 'off_topic',
+// forwarded } (forwarded = the organizer got an alert). ride_help: the question
+// asks for a ride; the app then shows its own rides card (the AI never sees names).
 // Never call an AI API from this file and never put a key here.
 //
-// Returns { answer } or { answer: null, forwarded, offTopic }, or null when the
+// Returns { answer, rideHelp } or { answer: null, forwarded, offTopic }, or null when the
 // Worker can't be reached. The answer is shown with textContent (never innerHTML).
 // ═════════════════════════════════════════════════════════════
 export const isLiveAIOn = () => Boolean(CONFIG.aiEndpoint);
@@ -466,7 +529,8 @@ export async function askLiveAI(question) {
     });
     const data = await res.json().catch(() => ({}));
     if (res.ok && data.status === 'answered' && typeof data.answer === 'string' && data.answer.trim()) {
-      return { answer: data.answer.trim() };
+      // ride_help: they're looking for a ride, so the app also shows the live drivers
+      return { answer: data.answer.trim(), rideHelp: data.ride_help === true };
     }
     return { answer: null, forwarded: data.forwarded === true, offTopic: data.status === 'off_topic' };
   } catch {

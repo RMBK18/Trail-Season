@@ -20,10 +20,27 @@ Phone ──PUT /rsvps/<hike>──▶ This Worker ──▶ Durable Object (SQL
   phone. No asks for a last initial.
 - **Offline:** the app keeps the last list it saw. A reply made with no signal is saved on the
   phone and sent automatically when the phone is back online.
-- **Privacy:** names only. Anyone with the app link can see them. Replies are deleted
-  automatically **7 days after each hike**, and replies close at the end of the hike day.
+- **Privacy:** names, plus (only for drivers and riders who choose to) an area and a WhatsApp
+  number. Anyone with the app link can see them; numbers sit behind the **Message** button and
+  never go into Summan's alerts or the logs. Replies, numbers, seats and ride-alert sign-ups are
+  deleted automatically **7 days after each hike**, and replies close at the end of the hike day.
 - **Limits:** 30 changes and 120 reads a minute per visitor, and 100 replies per hike. Names are 1–40
   characters; guests 0–5; seats 1–6.
+
+## Carpool ("Rides")
+
+| Piece | How it works |
+|---|---|
+| Area | Drivers and riders pick where they leave from (Downtown … Waterloo, or Other + a few words). The list is in `../../js/carpool.js`. Riders see drivers from their area first, then the nearest. |
+| WhatsApp | Optional. Ticked by default for drivers, unticked for riders; the number always starts empty. 10-digit numbers get +1. **Message** opens `wa.me/<number>?text=…` with a message already written; if WhatsApp doesn't open, the number shows so they can text or call. |
+| Ride with | `PUT /rides/<hike> {"driver":"Name"}` saves a seat. The rider must be **Coming** + **Need a ride**; a rider plus their guests take `1 + guests` seats; one seat at a time per rider (tapping another car moves it). |
+| Cancel my seat | `DELETE /rides/<hike>`. Drivers can't remove riders. |
+| Driver changes | A driver can't offer fewer seats than are taken. A driver who stops driving (or goes Maybe, or removes their reply) releases their riders, who see "*Name* is no longer driving". The app warns first. |
+| Ride alerts | Drivers only, opt-in: `PUT /push/<hike>` with the phone's PushSubscription. One notification per rider per driver, ever ("🚗 Sara (Downtown) wants a ride with you"), sent with Web Push (`src/webpush.js`: RFC 8291 encryption, RFC 8292 VAPID). Only push services' own addresses are accepted. Android: works in Chrome. iPhone: only once the app is on the Home Screen (iOS 16.4+). |
+
+The list API adds `area`, `phone` (shared numbers only), `seatsLeft` (drivers) and `ride` (the
+driver a rider has a seat with); on your own entry, `alerts` and `lostRide`. `GET /rsvps` also
+returns `pushKey`, the public VAPID key the app needs to turn alerts on.
 
 ## Deploy
 
@@ -38,10 +55,22 @@ printf '%s' "your-ntfy-channel" | npx wrangler secret put NTFY_TOPIC
 openssl rand -base64 48 | tr -d '\n' | npx wrangler secret put ADMIN_SECRET
 ```
 
+Ride alerts need a VAPID key pair. Make one (the private half goes straight into the secret and
+is never shown), then put the printed public half in `VAPID_PUBLIC_KEY` in `wrangler.toml` and
+deploy again:
+
+```bash
+node -e 'const e=require("crypto").createECDH("prime256v1");e.generateKeys();const d=e.getPrivateKey();require("fs").writeFileSync(1,Buffer.concat([Buffer.alloc(32-d.length),d]).toString("base64url"));console.error("VAPID_PUBLIC_KEY =",e.getPublicKey("base64url"))' | npx wrangler secret put VAPID_PRIVATE_KEY
+```
+
+Changing the pair later means drivers turn alerts on again (the app re-subscribes when they do).
+
 | Name | Where | What |
 |---|---|---|
 | `NTFY_TOPIC` | Secret | Your private ntfy channel: an alert for every reply. Use the same channel as the AI Worker. |
 | `ADMIN_SECRET` | Secret | Any long random text. Signs the **Remove reply** links in alerts, so nobody else can make one. |
+| `VAPID_PRIVATE_KEY` | Secret | Private half of the ride-alert key pair (base64url, 32 bytes). Without it, ride alerts are off and the app hides the option. |
+| `VAPID_PUBLIC_KEY` | `[vars]` in `wrangler.toml` | Public half (base64url, 65 bytes). Not secret. |
 | `ALLOWED_ORIGIN` | `[vars]` in `wrangler.toml` | `https://fallhike.pages.dev,https://rmbk18.github.io` (origins only, no path) |
 | `APP_URL` | `[vars]` in `wrangler.toml` | The app's address, for the **Open hike** button in alerts |
 
@@ -52,7 +81,7 @@ Then set `rsvpEndpoint` in `js/config.js` to the Worker URL and bump `VERSION` i
 Open the Worker URL in a browser:
 
 ```json
-{"ok":true,"service":"fall-hike-rsvp","storageConfigured":true,"alertsConfigured":true,"removeLinks":true}
+{"ok":true,"service":"fall-hike-rsvp","storageConfigured":true,"alertsConfigured":true,"removeLinks":true,"rideAlerts":true}
 ```
 
 Test script (writes only to a hidden test hike: no alerts, not shown in the app, cleaned up):
@@ -62,10 +91,18 @@ node test.mjs https://fall-hike-rsvp.<your-subdomain>.workers.dev
 ```
 
 It checks CORS and blocked sites, replying, updating, the "Is that you?" name check, input
-limits, plain-text names, and removing replies.
+limits, plain-text names, removing replies, and carpooling: areas and numbers, seats counting
+down (guests included), full cars, cancelling, switching cars, drivers dropping out, and ride
+alert sign-ups. It waits when it hits the rate limit, so it takes a few minutes.
 
-Local: `npx wrangler dev` then `node test.mjs http://localhost:8787`. For alerts in local
-testing, put `NTFY_TOPIC`, `ADMIN_SECRET` and `NTFY_URL` (a local mock) in `.dev.vars`.
+`node test-webpush.mjs` checks the push encryption against the RFC 8291 test vector and the
+VAPID signature, with no network.
+
+Local: `npx wrangler dev` then `LOCAL=1 node test.mjs http://localhost:8787`. LOCAL=1 also runs
+a mock push service and a mock ntfy, to check the notification a driver's phone decrypts and
+that phone numbers never reach Summan's alerts. Put these in `.dev.vars` (never committed):
+`NTFY_TOPIC`, `ADMIN_SECRET`, `NTFY_URL=http://127.0.0.1:8799`, `ALLOW_HTTP_PUSH=1`, and a
+test `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` pair.
 
 ## Removing a junk reply
 
@@ -83,3 +120,5 @@ can't remove anything.
 | No **Remove reply** button in alerts | `"removeLinks":false`: set the `ADMIN_SECRET` secret. |
 | Replies for an edited hike are missing | Hike ids come from `js/data.js`. After changing hike ids or dates, redeploy the Worker. |
 | `429` | More than 30 changes a minute from one network. Wait a minute. |
+| No 🔔 ride-alert option | `"rideAlerts":false` in the health check: set `VAPID_PRIVATE_KEY` and `VAPID_PUBLIC_KEY`. On iPhone the option says to add the app to the Home Screen first. |
+| A driver gets no notification | They must have ticked 🔔 and allowed notifications; each rider alerts a driver once, ever. If their phone unsubscribed, the push service says so and the sign-up is dropped: tick 🔔 again. |
