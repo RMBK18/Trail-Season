@@ -974,3 +974,6 @@ button.ans-link { border: 0; cursor: pointer; }
 .ans-update { margin: 0 0 8px; padding: 8px 10px; border-radius: 12px; background: var(--time-bg); color: var(--time-ink); border: 1px solid var(--time-line); white-space: pre-line; }
 .ans-update.urgent { background: var(--warn-bg); color: var(--warn-ink); border-color: var(--warn-line); }
 .msg .ans-update + .msg-fine { margin: -4px 0 8px; }
+.org-entry { margin: 18px 0 4px; text-align: center; font-size: 14px; }
+.org-entry a { display: inline-flex; align-items: center; gap: 6px; color: var(--ink-2); font-weight: 650; text-decoration: none; }
+.org-entry .ic { width: 16px; height: 16px; }

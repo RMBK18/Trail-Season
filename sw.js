@@ -7,7 +7,7 @@
 // they open the app with a connection.
 // ─────────────────────────────────────────────────────────────
 
-const VERSION = 'fall-hike-2026-10-v21';
+const VERSION = 'fall-hike-2026-10-v22';
 
 // The app shell is cached as './', never './index.html': Cloudflare Pages
 // redirects /index.html to /, and Chrome won't open a page from a redirected

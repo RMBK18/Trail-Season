@@ -1218,11 +1218,36 @@ function orgHistoryHTML() {
   </li>`).join('')}</ul>`;
 }
 
-async function openOrganizer() {
-  if (!organizerKey()) {
-    openSheet('organizer', `<h2 id="sheet-title">Organizer only</h2><p class="sheet-sub">This screen is only for ${esc(APP.askPerson)}.</p><button class="btn btn-text" type="button" data-close-sheet>Close</button>`);
+// No key on this phone yet: paste the organizer link. Needed where links from ntfy
+// open somewhere else (an iPhone Home Screen app doesn't share Safari's storage).
+function openOrganizerUnlock() {
+  openSheet('organizer', `
+    <span class="sheet-badge" aria-hidden="true">${I.megaphone}</span>
+    <h2 id="sheet-title">Organizer: unlock posting updates</h2>
+    <p class="sheet-sub">Only for ${esc(APP.askPerson)}. Paste the organizer link from your ntfy message to post plan updates from this phone.</p>
+    <form class="rsvp-form" data-org-unlock novalidate>
+      <label class="field"><span>Organizer link</span><input type="url" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="go" data-org-link placeholder="https://fallhike.pages.dev/#/organizer?k=…"></label>
+      <p class="fine">The link is in the text of the ntfy message "Fall Hike App: your organizer link". Copy it, then paste it here.</p>
+      <button class="btn btn-primary" type="submit">Unlock</button>
+    </form>
+    <button class="btn btn-text" type="button" data-close-sheet>Close</button>`);
+}
+
+function unlockOrganizer(form) {
+  const raw = $('[data-org-link]', form).value.trim();
+  const key = (raw.match(/[?&]k=([A-Za-z0-9_-]{20,200})/) || raw.match(/^([A-Za-z0-9_-]{20,200})$/) || [])[1];
+  if (!key) {
+    toast("That isn't the organizer link. Copy the whole link from the ntfy message.");
+    $('[data-org-link]', form).focus();
     return;
   }
+  setOrganizerKey(key);
+  renderHome();
+  openOrganizer(); // checks the key with the server; a wrong one is removed again
+}
+
+async function openOrganizer() {
+  if (!organizerKey()) return openOrganizerUnlock();
   openSheet('organizer', `<h2 id="sheet-title">Send an update</h2><p class="sheet-sub">Loading…</p>`);
   try {
     orgView = await organizerView();
@@ -1230,7 +1255,7 @@ async function openOrganizer() {
     if (err.code === 'not_organizer') {
       clearOrganizerKey();
       renderHome();
-      openSheet('organizer', `<h2 id="sheet-title">This organizer link isn't valid anymore</h2><p class="sheet-sub">Ask for a new one. Nothing was posted.</p><button class="btn btn-text" type="button" data-close-sheet>Close</button>`);
+      openSheet('organizer', `<h2 id="sheet-title">This organizer link isn't valid anymore</h2><p class="sheet-sub">Check you copied the newest one. Nothing was posted.</p><button class="btn btn-text" type="button" data-close-sheet>Close</button>`);
     } else {
       openSheet('organizer', `<h2 id="sheet-title">Send an update</h2><p class="sheet-sub">${err.code === 'network' ? 'No signal right now. Updates need signal to send.' : esc(err.message)}</p><button class="btn btn-text" type="button" data-close-sheet>Close</button>`);
     }
@@ -1664,6 +1689,7 @@ function renderShare() {
         ${stepsHTML(ANDROID_STEPS)}
         <p class="fine">Once installed, the app opens full screen and keeps working without signal.</p>
       </section>
+      ${isRsvpLive() ? `<p class="org-entry"><a href="#/organizer">${I.megaphone}<span>Organizer: post a plan update</span></a></p>` : ''}
       ${photo ? `<p class="photo-credit">${photoCredit(photo, 'Top photo')}</p>` : ''}
     </div>`;
 }
@@ -2201,6 +2227,11 @@ document.addEventListener('submit', (e) => {
   if (e.target.matches('[data-org-form]')) {
     e.preventDefault();
     confirmUpdate(e.target);
+    return;
+  }
+  if (e.target.matches('[data-org-unlock]')) {
+    e.preventDefault();
+    unlockOrganizer(e.target);
     return;
   }
   if (e.target.id !== 'ask-form') return;
