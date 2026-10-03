@@ -74,10 +74,17 @@ CARPOOLING (the Rides list on each hike page of the app)
 - Sharing a WhatsApp number is optional. There are no logins, so anyone with the app link can see a shared number when they tap Message.
 - Riders can cancel their seat any time with Cancel my seat. Drivers can't remove riders; they sort it out on WhatsApp and the rider cancels.
 - People coming with you need seats too.
-- Drivers can turn on ride alerts: one notification each time someone taps Ride with them, and no other notifications. On iPhone, alerts need the app added to the Home Screen (iOS 16.4 or later).
+- Drivers can turn on ride alerts: one notification each time someone taps Ride with them. On iPhone, notifications need the app added to the Home Screen (iOS 16.4 or later).
 - If a driver stops driving, their riders lose their seats and see a notice in the app.
 - Numbers, areas, seats and ride alerts are deleted a week after each hike.
 - Areas to pick from: Downtown, Etobicoke, North York, Scarborough, Markham, Vaughan, Mississauga, Brampton, Oakville, Milton, Burlington, Hamilton, Waterloo, or Other.
+
+PLAN UPDATES FROM ${APP.askPerson.toUpperCase()}
+- Only ${APP.askPerson} can post plan updates in the app, for one hike or for everyone.
+- Everyone sees updates in the app: pinned on the home screen and on the hike's page, and under All updates.
+- People who replied Coming or Maybe to a hike can turn on notifications to get its updates on their phone. The app asks once after you reply; you can turn them off any time.
+- The app sends only two kinds of notifications: ride requests (for drivers who turned them on) and ${APP.askPerson}'s plan updates.
+- Updates are deleted a week after the hike they're about.
 
 GROUP RULES AND TIPS
 - Rain: ${GROUP.rain}

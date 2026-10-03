@@ -23,7 +23,8 @@ VAPID_PUBLIC_KEY = "BMwJtfDegXgdNwwX8OMNJi28HQpa8g7nGC8dKH2anDdnkEcvVY2FTOjvDD-p
 # Secrets, NOT set here (see README.md):
 #   NTFY_TOPIC         your private ntfy channel: an alert for every reply
 #   ADMIN_SECRET       any long random text: signs the "Remove reply" links in alerts
-#   VAPID_PRIVATE_KEY  private half of the VAPID key pair (ride alerts)
+#   VAPID_PRIVATE_KEY  private half of the VAPID key pair (ride alerts, plan updates)
+#   ORGANIZER_KEY      long random text: unlocks posting plan updates (organizer link)
 
 # Every reply lives in one Durable Object with its own small SQLite database.
 # Free plan: SQLite-backed Durable Objects only (hence new_sqlite_classes).

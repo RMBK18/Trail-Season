@@ -7,7 +7,7 @@
 // they open the app with a connection.
 // ─────────────────────────────────────────────────────────────
 
-const VERSION = 'fall-hike-2026-10-v20';
+const VERSION = 'fall-hike-2026-10-v21';
 
 // The app shell is cached as './', never './index.html': Cloudflare Pages
 // redirects /index.html to /, and Chrome won't open a page from a redirected
@@ -99,9 +99,10 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
-// ── Ride alerts (drivers who turned them on) ────────────────
-// The only notification the app ever shows: "🚗 Sara (Downtown) wants a ride
-// with you". Tapping it opens that hike's Rides list.
+// ── Notifications (ride requests, plan updates) ─────────────
+// The app's two notifications: ride requests for drivers ("🚗 Sara (Downtown)
+// wants a ride with you") and the organizer's plan updates ("📣 Update from
+// Summan"). Tapping one opens the hike's Rides or updates.
 self.addEventListener('push', (event) => {
   let msg = {};
   try { msg = event.data ? event.data.json() : {}; } catch { /* not JSON: show the plain title */ }

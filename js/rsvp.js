@@ -11,6 +11,7 @@
 //                   so only this phone can change its own replies.
 //   fh:rsvps        the last lists seen, so the page works with no signal
 //   fh:rsvp-outbox  replies made with no signal; sent when the phone is back online
+//   fh:organizer    the organizer key, only on the organizer's phone (from their private link)
 //
 // Carpool: saving a seat ("Ride with"), cancelling it, and drivers' ride alerts
 // need signal, so they're never queued.
@@ -64,14 +65,14 @@ export class RsvpError extends Error {
 // No signal, a timeout, "too many requests" or a server hiccup: worth trying again later.
 const retryable = (err) => err.code === 'network' || err.code === 'http_429' || /^http_5/.test(err.code);
 
-async function request(method, path, body) {
+async function request(method, path, body, headers = {}) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
   let res;
   try {
     res = await fetch(base() + path, {
       method,
-      headers: { 'X-Device': deviceId(), ...(body ? { 'Content-Type': 'application/json' } : {}) },
+      headers: { 'X-Device': deviceId(), ...(body ? { 'Content-Type': 'application/json' } : {}), ...headers },
       body: body ? JSON.stringify(body) : undefined,
       cache: 'no-store',
       signal: ctrl.signal,
@@ -93,7 +94,8 @@ async function request(method, path, body) {
 }
 
 // ── What this phone knows ───────────────────────────────────
-// cache = { at: last full refresh (ms), hikes: { [hikeId]: entry[] }, pushKey }
+// cache = { at: last full refresh (ms), hikes: { [hikeId]: entry[] }, pushKey,
+//           updates: the organizer's plan updates (newest first), me: { updates: this phone gets them } }
 let cache = read(CACHE_KEY, null) || { at: 0, hikes: {} };
 const listeners = new Set();
 const problemListeners = new Set();
@@ -175,7 +177,7 @@ export function refreshAll() {
     try {
       await flushOutbox();
       const data = await request('GET', '/rsvps');
-      cache = { at: Date.now(), hikes: data.hikes || {}, pushKey: data.pushKey || null };
+      cache = { at: Date.now(), hikes: data.hikes || {}, pushKey: data.pushKey || null, updates: data.updates || [], me: data.me || {} };
       write(CACHE_KEY, cache);
       emit();
     } finally {
@@ -295,6 +297,55 @@ export function setRideAlerts(hikeId, subscription) {
   return subscription
     ? live(hikeId, 'PUT', `/push/${hikeId}`, subscription.toJSON ? subscription.toJSON() : subscription)
     : live(hikeId, 'DELETE', `/push/${hikeId}`);
+}
+
+// ── Plan updates from the organizer ─────────────────────────
+/** Every current update, newest first: { id, hike (null = everyone), text, urgent, at }. */
+export const allUpdates = () => (Array.isArray(cache.updates) ? cache.updates : []);
+
+/** True when this phone gets plan updates as notifications. */
+export const updateAlertsOn = () => Boolean(cache.me?.updates);
+
+function saveCache(changes) {
+  cache = { ...cache, ...changes };
+  write(CACHE_KEY, cache);
+  emit();
+}
+
+/** Turn plan update notifications on (with this phone's PushSubscription) or off (null). Needs signal. */
+export async function setUpdateAlerts(subscription) {
+  const data = subscription
+    ? await request('PUT', '/notify', subscription.toJSON ? subscription.toJSON() : subscription)
+    : await request('DELETE', '/notify');
+  saveCache({ me: { ...cache.me, updates: Boolean(data.updates) } });
+  return data;
+}
+
+// ── Organizer (only on the organizer's phone) ───────────────
+const ORGANIZER_KEY = 'fh:organizer';
+export const organizerKey = () => {
+  const k = read(ORGANIZER_KEY, '');
+  return typeof k === 'string' && /^[A-Za-z0-9_-]{20,200}$/.test(k) ? k : '';
+};
+export const setOrganizerKey = (k) => write(ORGANIZER_KEY, k);
+export const clearOrganizerKey = () => { try { localStorage.removeItem(ORGANIZER_KEY); } catch { /* nothing saved */ } };
+const asOrganizer = (method, path, body) => request(method, path, body, { 'X-Organizer': organizerKey() });
+
+/** Reach per hike ({ people, phones }) and past updates. Rejects with code 'not_organizer' for a wrong key. */
+export const organizerView = () => asOrganizer('GET', '/organizer');
+
+/** Post an update ({ hike: id or '', text, urgent }). Resolves { update, people, phones, queued }. */
+export async function postUpdate(update) {
+  const data = await asOrganizer('POST', '/updates', update);
+  saveCache({ updates: [data.update, ...allUpdates().filter((u) => u.id !== data.update.id)] });
+  return data;
+}
+
+/** Take an update down for everyone. */
+export async function deleteUpdate(id) {
+  const data = await asOrganizer('DELETE', `/updates/${id}`);
+  saveCache({ updates: allUpdates().filter((u) => u.id !== id) });
+  return data;
 }
 
 /** Remove this phone's reply. Resolves { sent: true } or, with no signal, { sent: false, queued: true }. */

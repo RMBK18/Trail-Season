@@ -29,6 +29,7 @@ export const I = {
   sparkle: svg('<path d="M12 3.5 13.8 10 20.5 12l-6.7 2L12 20.5 10.2 14 3.5 12l6.7-2Z"/>'),
   download: svg('<path d="M12 4v11"/><path d="m7.5 10.5 4.5 4.5 4.5-4.5"/><path d="M5 19.5h14"/>'),
   chat: svg('<path d="M20.5 12a8 8 0 0 1-11.7 7.1L3.5 20.5l1.4-4.6A8 8 0 1 1 20.5 12Z"/><path d="M8.5 10.5h7M8.5 13.5h4.5"/>'),
+  megaphone: svg('<path d="M4 10v4a1 1 0 0 0 1 1h2l5 4V5L7 9H5a1 1 0 0 0-1 1Z"/><path d="M15.5 9a4 4 0 0 1 0 6"/><path d="M18 6.5a7.5 7.5 0 0 1 0 11"/>'),
   bell: svg('<path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15Z"/><path d="M10 20.5a2.2 2.2 0 0 0 4 0"/>'),
   close: svg('<path d="m6.5 6.5 11 11M17.5 6.5l-11 11"/>', 'stroke-width="2.2"'),
   link: svg('<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>'),

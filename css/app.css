@@ -923,3 +923,54 @@ button.ans-link { border: 0; cursor: pointer; }
 .weather-text b { margin: 2px 0 1px; font: 700 19px/1.25 var(--font-display); color: var(--heading); }
 .weather-none { display: flex; gap: 10px; align-items: flex-start; font-size: 15px; color: var(--ink-2); }
 .weather-none .ic { width: 20px; height: 20px; margin-top: 1px; color: var(--icon); }
+
+/* ── Plan updates from the organizer ── */
+.update-list { display: grid; gap: 8px; margin: 8px 0 0; padding: 0; list-style: none; }
+.update { padding: 12px 14px; border-radius: 16px; background: var(--time-bg); border: 1px solid var(--time-line); color: var(--time-ink); }
+.update.urgent { background: var(--warn-bg); border-color: var(--warn-line); color: var(--warn-ink); }
+.update-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 14.5px; }
+.update-head .ic { flex: none; width: 18px; height: 18px; }
+.update-head span { margin-left: auto; font-size: 13px; opacity: 0.8; }
+.update-for { margin-top: 2px; font-size: 13.5px; font-weight: 650; }
+.update-for a { color: inherit; }
+.update-text { margin-top: 6px; font-size: 16px; line-height: 1.45; white-space: pre-line; overflow-wrap: anywhere; }
+.update .fine { color: inherit; opacity: 0.85; }
+.update .link-btn { margin-top: 6px; color: inherit; }
+.block-updates h2 { display: flex; align-items: center; gap: 8px; }
+.block-updates h2 .ic { width: 22px; height: 22px; color: var(--link); }
+.block-updates[hidden], .updates-pin[hidden], .updates-ask[hidden] { display: none; }
+.update-optin {
+  display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; min-height: 40px; padding: 0 14px;
+  border: 0; border-radius: 999px; background: var(--action-soft); color: var(--link); font: 700 14.5px var(--font-body); cursor: pointer;
+}
+.update-optin .ic { width: 18px; height: 18px; }
+/* Pinned on the home photo */
+.updates-pin { margin-top: 16px; }
+.updates-pin .update-list { margin: 0; }
+.updates-pin .update { box-shadow: 0 10px 30px -12px rgba(0, 0, 0, 0.5); }
+.update-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.update-btn {
+  display: inline-flex; align-items: center; min-height: 36px; padding: 0 14px; border: 0; border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92); color: var(--forest); font: 700 14px var(--font-body); text-decoration: none; cursor: pointer;
+}
+.updates-pin .update-optin { background: rgba(23, 60, 44, 0.6); color: #fff; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35); }
+.updates-ask { padding: 12px 14px; border-radius: 14px; background: var(--icon-soft); font-size: 15px; }
+.updates-ask p { display: flex; gap: 8px; align-items: flex-start; }
+.updates-ask p .ic { flex: none; width: 20px; height: 20px; margin-top: 1px; color: var(--icon); }
+.updates-ask .btn-row .btn { margin-top: 10px; min-height: 44px; font-size: 14.5px; }
+/* Organizer screen */
+.org-form textarea {
+  width: 100%; min-height: 110px; padding: 12px 14px; border-radius: 12px; resize: vertical;
+  border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); font: 16px/1.45 var(--font-body);
+}
+.org-form textarea:focus { outline: none; border-color: var(--action); box-shadow: 0 0 0 3px var(--action-soft); }
+.org-reach, .org-count { margin-top: -6px; }
+.org-count { text-align: right; }
+.org-result { margin-top: 12px; padding: 12px 14px; border-radius: 14px; background: var(--icon-soft); font-size: 15px; }
+.org-result[hidden] { display: none; }
+.org-history .update { background: var(--surface-2); border-color: var(--line); color: var(--ink); }
+.org-history .update.urgent { background: var(--warn-bg); border-color: var(--warn-line); color: var(--warn-ink); }
+#org-btn { display: grid; place-items: center; }
+.ans-update { margin: 0 0 8px; padding: 8px 10px; border-radius: 12px; background: var(--time-bg); color: var(--time-ink); border: 1px solid var(--time-line); white-space: pre-line; }
+.ans-update.urgent { background: var(--warn-bg); color: var(--warn-ink); border-color: var(--warn-line); }
+.msg .ans-update + .msg-fine { margin: -4px 0 8px; }
