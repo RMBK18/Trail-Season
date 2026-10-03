@@ -6,6 +6,10 @@
 // so every phone sees the same list. The organizer gets an ntfy push alert for
 // each reply, with a link to remove junk entries.
 //
+// Plan updates: only the organizer can post them (organizer key). Everyone sees
+// them in the app; phones that turned on plan updates get a notification for
+// hikes they replied Coming or Maybe to.
+//
 // Carpool: drivers and riders add the area they leave from and, if they like,
 // a WhatsApp number. A rider can save a seat with a driver ("Ride with"); the
 // seats left count down by themselves. A driver who turned on alerts gets one
@@ -19,6 +23,12 @@
 //   DELETE /rides/:hikeId    cancel my seat             header X-Device
 //   PUT    /push/:hikeId     driver: turn on ride alerts (a PushSubscription)  header X-Device
 //   DELETE /push/:hikeId     driver: turn them off      header X-Device
+//   PUT    /notify           this phone: get plan updates as notifications (a PushSubscription)
+//   DELETE /notify           this phone: stop them
+//   GET    /organizer        organizer: reach per hike and past updates      header X-Organizer
+//   POST   /organizer/link   organizer: send the organizer link to the ntfy channel again
+//   POST   /updates          organizer: post an update { hike?, text, urgent? }; notifies Coming + Maybe
+//   DELETE /updates/:id      organizer: take an update down
 //   GET    /remove?e=&s=     organizer: confirm page for removing a reply (signed link from the alert)
 //   POST   /remove           organizer: remove it
 //
@@ -33,7 +43,7 @@
 
 import { DurableObject } from 'cloudflare:workers';
 // The same files the app uses, bundled in at deploy time.
-import { HIKES } from '../../../js/data.js';
+import { HIKES, APP } from '../../../js/data.js';
 import { endMs } from '../../../js/lib.js';
 import { findArea, normalizePhone, MAX_AREA_CHARS } from '../../../js/carpool.js';
 import { sendPush, subscriptionKeysOk, b64url, fromB64url } from './webpush.js';
@@ -124,6 +134,31 @@ const randomId = () => {
   return btoa(String.fromCharCode(...b)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 };
 
+// ── Plan updates (organizer only) ───────────────────────────
+const MAX_UPDATE_CHARS = 300;
+const DUPLICATE_UPDATE_MS = 2 * 60 * 1000; // the same update twice in 2 minutes is a double tap
+const EVERYONE_UPDATE_KEEP_MS = 14 * 24 * 3600 * 1000;
+const PUSH_BATCH = 40; // per alarm run; the free plan allows 50 outgoing calls per request
+
+// Like cleanName, but keeps line breaks (at most one blank line in a row).
+const INVISIBLE_KEEP_NEWLINES = /[\u0000-\u0009\u000b-\u001f\u007f-\u009f\u00ad\u200b-\u200f\u2028-\u202e\u2060-\u2064\u2066-\u206f\ufeff]/g;
+export function cleanText(raw) {
+  if (typeof raw !== 'string') return '';
+  return raw.normalize('NFKC').replace(/\r\n?/g, '\n').replace(INVISIBLE_KEEP_NEWLINES, '')
+    .replace(/[ \t]+/g, ' ').replace(/ ?\n ?/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+// The phone notification for an update. Tapping it opens the hike (or the updates list).
+function updateMessage(u, hike) {
+  const body = `${hike ? `${hike.dateShort}, ${hike.shortName}: ` : ''}${u.text}`.replace(/\s+/g, ' ');
+  return {
+    title: u.urgent ? `⚠️ Urgent update from ${APP.askPerson}` : `📣 Update from ${APP.askPerson}`,
+    body: [...body].length > 240 ? `${[...body].slice(0, 237).join('')}…` : body,
+    url: hike ? `#/hike/${hike.id}/updates` : '#/updates',
+    tag: `update-${u.id}`,
+  };
+}
+
 // ── Storage: one Durable Object holds every reply ────────────
 // What every phone sees. Numbers are sent only for the Message button; the
 // phone id (device hash) and row ids never leave the Worker.
@@ -201,6 +236,34 @@ export class RsvpStore extends DurableObject {
       endpoint   TEXT NOT NULL,
       p256dh     TEXT NOT NULL,
       auth       TEXT NOT NULL,
+      created_at INTEGER NOT NULL
+    )`);
+    // Plan updates from the organizer ('' hike = everyone), and the phones that
+    // asked to be notified (one per phone, whichever hikes it replied to).
+    this.sql.exec(`CREATE TABLE IF NOT EXISTS updates (
+      id         TEXT PRIMARY KEY,
+      hike_id    TEXT NOT NULL,
+      text       TEXT NOT NULL,
+      urgent     INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL,
+      phones     INTEGER NOT NULL DEFAULT 0,
+      delivered  INTEGER NOT NULL DEFAULT 0
+    )`);
+    this.sql.exec(`CREATE TABLE IF NOT EXISTS update_subs (
+      device     TEXT PRIMARY KEY,
+      endpoint   TEXT NOT NULL,
+      p256dh     TEXT NOT NULL,
+      auth       TEXT NOT NULL,
+      created_at INTEGER NOT NULL
+    )`);
+    // Notifications waiting to go out, sent in batches by the alarm.
+    this.sql.exec(`CREATE TABLE IF NOT EXISTS push_queue (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      endpoint   TEXT NOT NULL,
+      p256dh     TEXT NOT NULL,
+      auth       TEXT NOT NULL,
+      message    TEXT NOT NULL,
+      update_id  TEXT NOT NULL DEFAULT '',
       created_at INTEGER NOT NULL
     )`);
     for (const [from, to] of Object.entries(RENAMED)) {
@@ -447,6 +510,119 @@ export class RsvpStore extends DurableObject {
     this.sql.exec('DELETE FROM push_subs WHERE rsvp_id = ? AND endpoint = ?', rsvpId, endpoint);
   }
 
+  // ── Plan updates from the organizer ──
+  // Everyone sees every update in the app. Phones that turned on plan updates
+  // also get a notification for updates about hikes they replied Coming or Maybe to.
+  publicUpdates(hikeId = null) {
+    const rows = hikeId
+      ? this.sql.exec("SELECT * FROM updates WHERE hike_id = ? OR hike_id = '' ORDER BY created_at DESC", hikeId).toArray()
+      : this.sql.exec('SELECT * FROM updates WHERE hike_id != ? ORDER BY created_at DESC', SELFTEST).toArray();
+    return rows.map((u) => ({ id: u.id, hike: u.hike_id || null, text: u.text, urgent: Boolean(u.urgent), at: u.created_at }));
+  }
+
+  hasUpdateAlerts(deviceHash) {
+    return this.sql.exec('SELECT 1 FROM update_subs WHERE device = ?', deviceHash).toArray().length > 0;
+  }
+
+  // Turn plan updates on (with this phone's PushSubscription) or off, for this phone.
+  setUpdateAlerts(deviceHash, sub) {
+    if (sub) {
+      if (!this.sql.exec('SELECT 1 FROM rsvps WHERE device = ? LIMIT 1', deviceHash).toArray().length) return { error: 'no_reply' };
+      this.sql.exec(
+        `INSERT INTO update_subs (device, endpoint, p256dh, auth, created_at) VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT (device) DO UPDATE SET endpoint = excluded.endpoint, p256dh = excluded.p256dh, auth = excluded.auth, created_at = excluded.created_at`,
+        deviceHash, sub.endpoint, sub.p256dh, sub.auth, Date.now(),
+      );
+    } else {
+      this.sql.exec('DELETE FROM update_subs WHERE device = ?', deviceHash);
+    }
+    return { updates: Boolean(sub) };
+  }
+
+  // Who an update reaches: replies of Coming or Maybe to that hike (or, for everyone,
+  // to any hike still ahead), and which of those phones turned on plan updates.
+  audience(hikeId, now = Date.now()) {
+    const replies = hikeId
+      ? this.sql.exec("SELECT device FROM rsvps WHERE hike_id = ? AND status IN ('coming', 'maybe')", hikeId).toArray()
+      : this.sql.exec("SELECT device, hike_id FROM rsvps WHERE status IN ('coming', 'maybe')").toArray()
+        .filter((r) => { const h = hikeById.get(r.hike_id); return h && now <= endMs(h); });
+    const devices = [...new Set(replies.map((r) => r.device))];
+    const subs = new Map();
+    for (const d of devices) {
+      const s = this.sql.exec('SELECT endpoint, p256dh, auth FROM update_subs WHERE device = ?', d).toArray()[0];
+      if (s) subs.set(s.endpoint, { ...s }); // one notification per phone
+    }
+    return { people: hikeId ? replies.length : devices.length, phones: subs.size, subs: [...subs.values()] };
+  }
+
+  // For the organizer screen: how many each update would reach, and past updates.
+  organizerView(now = Date.now()) {
+    const reach = ({ people, phones }) => ({ people, phones });
+    const hikes = {};
+    for (const h of HIKES) if (now <= endMs(h)) hikes[h.id] = reach(this.audience(h.id, now));
+    const sent = this.sql.exec('SELECT * FROM updates WHERE hike_id != ? ORDER BY created_at DESC', SELFTEST).toArray()
+      .map((u) => ({ id: u.id, hike: u.hike_id || null, text: u.text, urgent: Boolean(u.urgent), at: u.created_at, phones: u.phones, delivered: u.delivered }));
+    return { everyone: reach(this.audience('', now)), hikes, updates: sent };
+  }
+
+  async postUpdate(hikeId, text, urgent) {
+    const now = Date.now();
+    const dup = this.sql.exec('SELECT id FROM updates WHERE hike_id = ? AND text = ? AND created_at > ?', hikeId, text, now - DUPLICATE_UPDATE_MS).toArray()[0];
+    if (dup) return { error: 'duplicate' };
+    const { people, phones, subs } = this.audience(hikeId, now);
+    const u = { id: randomId(), hike_id: hikeId, text, urgent: urgent ? 1 : 0, created_at: now };
+    // The test hike only notifies a local mock push service.
+    const send = pushReady(this.env) && (hikeId !== SELFTEST || this.env.ALLOW_HTTP_PUSH === '1') ? subs : [];
+    this.sql.exec(
+      'INSERT INTO updates (id, hike_id, text, urgent, created_at, phones, delivered) VALUES (?, ?, ?, ?, ?, ?, 0)',
+      u.id, u.hike_id, u.text, u.urgent, u.created_at, send.length,
+    );
+    const message = JSON.stringify(updateMessage(u, findHike(hikeId)));
+    for (const s of send) {
+      this.sql.exec('INSERT INTO push_queue (endpoint, p256dh, auth, message, update_id, created_at) VALUES (?, ?, ?, ?, ?, ?)', s.endpoint, s.p256dh, s.auth, message, u.id, now);
+    }
+    if (send.length) await this.wake();
+    else await this.scheduleCleanup();
+    return { update: { id: u.id, hike: hikeId || null, text, urgent: Boolean(urgent), at: now }, people, phones, queued: send.length };
+  }
+
+  deleteUpdate(id) {
+    const row = this.sql.exec('SELECT id FROM updates WHERE id = ?', id).toArray()[0];
+    this.sql.exec('DELETE FROM updates WHERE id = ?', id);
+    this.sql.exec('DELETE FROM push_queue WHERE update_id = ?', id); // not sent yet: never will be
+    return { removed: Boolean(row) };
+  }
+
+  // Run the alarm now (it sends queued notifications).
+  async wake() {
+    const now = Date.now();
+    const current = await this.ctx.storage.getAlarm();
+    if (current == null || current > now) await this.ctx.storage.setAlarm(now);
+  }
+
+  // Send up to `limit` queued notifications. Each alarm run is its own request, which keeps
+  // every run under the free plan's limit on outgoing calls. Returns how many are left.
+  async sendQueued(limit) {
+    const batch = this.sql.exec('SELECT * FROM push_queue ORDER BY id LIMIT ?', limit).toArray();
+    if (!batch.length) return 0;
+    const vapid = { publicKey: this.env.VAPID_PUBLIC_KEY, privateKey: this.env.VAPID_PRIVATE_KEY, subject: this.env.APP_URL || 'https://fallhike.pages.dev/' };
+    await Promise.all(batch.map(async (q) => {
+      try {
+        const status = await sendPush(q, JSON.parse(q.message), vapid, { ttl: 24 * 3600 });
+        if (status >= 200 && status < 300) this.sql.exec('UPDATE updates SET delivered = delivered + 1 WHERE id = ?', q.update_id);
+        else if (status === 404 || status === 410) {
+          // That phone unsubscribed: forget it everywhere.
+          this.sql.exec('DELETE FROM update_subs WHERE endpoint = ?', q.endpoint);
+          this.sql.exec('DELETE FROM push_subs WHERE endpoint = ?', q.endpoint);
+        } else console.error('Plan update push failed:', status);
+      } catch (err) {
+        console.error('Plan update push failed:', err.message);
+      }
+      this.sql.exec('DELETE FROM push_queue WHERE id = ?', q.id);
+    }));
+    return this.sql.exec('SELECT COUNT(*) AS n FROM push_queue').one().n;
+  }
+
   // ── Automatic clean-up: a week after each hike, its replies are deleted ──
   purgeTime(hikeId, updatedAt) {
     if (hikeId === SELFTEST) return updatedAt + (Number(this.env.SELFTEST_KEEP_SECONDS) * 1000 || SELFTEST_KEEP_MS);
@@ -454,11 +630,18 @@ export class RsvpStore extends DurableObject {
     return h ? endMs(h) + KEEP_AFTER_HIKE_MS : 0; // a hike no longer in the plan: delete now
   }
 
+  // Hike updates go a week after the hike; updates to everyone two weeks after they're sent.
+  updatePurgeTime(u) {
+    if (!u.hike_id) return u.created_at + EVERYONE_UPDATE_KEEP_MS;
+    return this.purgeTime(u.hike_id, u.created_at);
+  }
+
   nextPurge() {
     let next = Infinity;
     for (const r of this.sql.exec('SELECT hike_id, MIN(updated_at) AS t FROM rsvps GROUP BY hike_id')) {
       next = Math.min(next, this.purgeTime(r.hike_id, r.t));
     }
+    for (const u of this.sql.exec('SELECT hike_id, created_at FROM updates')) next = Math.min(next, this.updatePurgeTime(u));
     return Number.isFinite(next) ? next : null;
   }
 
@@ -470,6 +653,7 @@ export class RsvpStore extends DurableObject {
   }
 
   async alarm() {
+    const left = await this.sendQueued(Number(this.env.PUSH_BATCH) || PUSH_BATCH);
     const now = Date.now();
     for (const r of this.sql.exec('SELECT id, hike_id, updated_at FROM rsvps').toArray()) {
       if (this.purgeTime(r.hike_id, r.updated_at) <= now) this.sql.exec('DELETE FROM rsvps WHERE id = ?', r.id);
@@ -478,8 +662,14 @@ export class RsvpStore extends DurableObject {
     this.sql.exec('DELETE FROM ride_requests WHERE driver_id NOT IN (SELECT id FROM rsvps) OR rider_id NOT IN (SELECT id FROM rsvps)');
     this.sql.exec('DELETE FROM ride_pings WHERE driver_id NOT IN (SELECT id FROM rsvps) OR rider_id NOT IN (SELECT id FROM rsvps)');
     this.sql.exec('DELETE FROM push_subs WHERE rsvp_id NOT IN (SELECT id FROM rsvps)');
-    const next = this.nextPurge();
-    if (next != null) await this.ctx.storage.setAlarm(Math.max(next, now + 1000));
+    // A phone with no replies left gets no plan updates.
+    this.sql.exec('DELETE FROM update_subs WHERE device NOT IN (SELECT device FROM rsvps)');
+    for (const u of this.sql.exec('SELECT id, hike_id, created_at FROM updates').toArray()) {
+      if (this.updatePurgeTime(u) <= now) this.deleteUpdate(u.id);
+    }
+    // More notifications to send: run again right away; otherwise at the next clean-up.
+    const next = left ? now : this.nextPurge();
+    if (next != null) await this.ctx.storage.setAlarm(Math.max(next, now + (left ? 100 : 1000)));
   }
 }
 
@@ -491,8 +681,8 @@ function allowedOrigins(env) {
 function corsHeaders(origin) {
   return {
     'Access-Control-Allow-Origin': origin,
-    'Access-Control-Allow-Methods': 'GET, PUT, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, X-Device',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, X-Device, X-Organizer',
     'Access-Control-Max-Age': '86400',
     Vary: 'Origin',
   };
@@ -698,6 +888,68 @@ async function readJson(request) {
   }
 }
 
+// ── The organizer (Summan) ──────────────────────────────────
+// Posting updates needs the organizer key (ORGANIZER_KEY secret), sent in the
+// X-Organizer header. The app gets it from a private link sent to the
+// organizer's ntfy channel; changing the secret makes old links stop working.
+async function isOrganizer(request, env) {
+  const key = request.headers.get('X-Organizer') || '';
+  if (!env.ORGANIZER_KEY || key.length < 20 || key.length > 200) return false;
+  const digest = async (t) => crypto.subtle.digest('SHA-256', new TextEncoder().encode(t));
+  return crypto.subtle.timingSafeEqual(await digest(key), await digest(env.ORGANIZER_KEY));
+}
+
+// Sends the organizer link to the organizer's own ntfy channel.
+async function sendOrganizerLink(env) {
+  if (!env.NTFY_TOPIC || !env.APP_URL) return false;
+  const url = `${env.APP_URL}#/organizer?k=${encodeURIComponent(env.ORGANIZER_KEY)}`;
+  const res = await fetch(env.NTFY_URL || 'https://ntfy.sh', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      topic: env.NTFY_TOPIC,
+      title: 'Fall Hike App: your organizer link',
+      message: 'Open this on your phone to post plan updates from the app. Keep it to yourself: anyone with this link can post as you.',
+      tags: ['loudspeaker'],
+      click: url,
+      actions: [{ action: 'view', label: 'Unlock organizer', url }],
+    }),
+  });
+  return res.ok;
+}
+
+async function organizerRoutes(request, env, path, cors) {
+  const read = request.method === 'GET';
+  if (await limited(read ? env.READ_LIMITER : env.WRITE_LIMITER, request)) return json({ error: 'Too many requests. Wait a minute.' }, 429, { ...cors, 'Retry-After': '60' });
+  if (!(await isOrganizer(request, env))) return json({ error: 'not_organizer', message: 'This is only for the organizer.' }, 403, cors);
+  const db = store(env);
+
+  if (path === '/organizer' && read) return json({ ok: true, ...(await db.organizerView()), now: Date.now() }, 200, cors);
+  if (path === '/organizer/link' && request.method === 'POST') {
+    const sent = await sendOrganizerLink(env).catch(() => false);
+    return json({ ok: sent, sent }, sent ? 200 : 502, cors);
+  }
+  if (path === '/updates' && request.method === 'POST') {
+    const { body, status, error } = await readJson(request);
+    if (!body) return json({ error }, status, cors);
+    const hikeId = body.hike ? String(body.hike) : '';
+    if (hikeId) {
+      const hike = findHike(RENAMED[hikeId] || hikeId);
+      if (!hike) return json({ error: 'Unknown hike' }, 404, cors);
+      if (hikeOver(hike)) return json({ error: 'hike_over', message: 'That hike is over.' }, 409, cors);
+    }
+    const text = cleanText(body.text);
+    if (!text) return json({ error: 'Write the update first' }, 400, cors);
+    if ([...text].length > MAX_UPDATE_CHARS) return json({ error: `Updates are ${MAX_UPDATE_CHARS} characters at most` }, 400, cors);
+    const out = await db.postUpdate(RENAMED[hikeId] || hikeId, text, body.urgent === true);
+    if (out.error === 'duplicate') return json({ error: 'duplicate', message: 'You just sent that update.' }, 409, cors);
+    return json({ ok: true, ...out }, 200, cors);
+  }
+  const del = /^\/updates\/([A-Za-z0-9_-]{8,40})$/.exec(path);
+  if (del && request.method === 'DELETE') return json({ ok: true, ...(await db.deleteUpdate(del[1])) }, 200, cors);
+  return json({ error: 'Not found' }, 404, cors);
+}
+
 // ── The Worker ──────────────────────────────────────────────
 export default {
   async fetch(request, env, ctx) {
@@ -710,7 +962,7 @@ export default {
     if (request.method === 'GET' && path === '/') {
       return json({
         ok: true, service: 'fall-hike-rsvp', storageConfigured: Boolean(env.RSVPS), alertsConfigured: Boolean(env.NTFY_TOPIC),
-        removeLinks: Boolean(env.ADMIN_SECRET), rideAlerts: pushReady(env),
+        removeLinks: Boolean(env.ADMIN_SECRET), rideAlerts: pushReady(env), organizer: Boolean(env.ORGANIZER_KEY),
       }, 200);
     }
 
@@ -721,7 +973,12 @@ export default {
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
     if (!env.RSVPS) return json({ error: 'RSVP storage is not set up' }, 500, cors);
 
-    const m = /^\/(rsvps|rides|push)(?:\/([a-z0-9_-]{1,60}))?$/.exec(path);
+    // Organizer only: post or delete plan updates
+    if (path === '/organizer' || path === '/organizer/link' || path === '/updates' || path.startsWith('/updates/')) {
+      return organizerRoutes(request, env, path, cors);
+    }
+
+    const m = /^\/(rsvps|rides|push|notify)(?:\/([a-z0-9_-]{1,60}))?$/.exec(path);
     if (!m) return json({ error: 'Not found' }, 404, cors);
     const what = m[1];
     const hikeId = m[2] ? RENAMED[m[2]] || m[2] : null;
@@ -738,10 +995,31 @@ export default {
       if (hikeId) {
         const hike = findHike(hikeId);
         if (!hike) return json({ error: 'Unknown hike' }, 404, cors);
-        return json({ hike: hikeId, list: await db.list(deviceHash, hikeId), now: Date.now() }, 200, cors);
+        return json({ hike: hikeId, list: await db.list(deviceHash, hikeId), updates: await db.publicUpdates(hikeId), now: Date.now() }, 200, cors);
       }
-      // pushKey: the app needs it to turn on ride alerts (null = alerts not set up)
-      return json({ hikes: await db.list(deviceHash), now: Date.now(), pushKey: pushReady(env) ? env.VAPID_PUBLIC_KEY : null }, 200, cors);
+      // pushKey: the app needs it to turn on notifications (null = not set up).
+      // updates: the organizer's plan updates; me.updates: this phone gets them as notifications.
+      return json({
+        hikes: await db.list(deviceHash), updates: await db.publicUpdates(), me: { updates: await db.hasUpdateAlerts(deviceHash) },
+        now: Date.now(), pushKey: pushReady(env) ? env.VAPID_PUBLIC_KEY : null,
+      }, 200, cors);
+    }
+
+    // Plan updates on this phone (any hike it replied Coming or Maybe to)
+    if (what === 'notify') {
+      if (request.method !== 'PUT' && request.method !== 'DELETE') return json({ error: 'Method not allowed' }, 405, { ...cors, Allow: 'PUT, DELETE, OPTIONS' });
+      if (await limited(env.WRITE_LIMITER, request)) return json({ error: 'Too many changes. Wait a minute and try again.' }, 429, { ...cors, 'Retry-After': '60' });
+      if (request.method === 'DELETE') return json({ ok: true, ...(await db.setUpdateAlerts(deviceHash, null)) }, 200, cors);
+      if (!pushReady(env)) return json({ error: 'alerts_off', message: 'Notifications aren\'t set up yet.' }, 503, cors);
+      const { body, status, error } = await readJson(request);
+      if (!body) return json({ error }, status, cors);
+      const sub = { endpoint: body.endpoint, p256dh: body.keys?.p256dh, auth: body.keys?.auth };
+      if (!pushEndpointOk(sub.endpoint, env) || !subscriptionKeysOk(sub.p256dh, sub.auth)) {
+        return json({ error: 'This phone\'s notification details didn\'t look right. Try again.' }, 400, cors);
+      }
+      const out = await db.setUpdateAlerts(deviceHash, sub);
+      if (out.error) return json({ error: 'no_reply', message: 'Reply to a hike first, then turn on plan updates.' }, 409, cors);
+      return json({ ok: true, ...out }, 200, cors);
     }
 
     if (request.method !== 'PUT' && request.method !== 'DELETE') {

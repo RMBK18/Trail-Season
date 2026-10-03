@@ -42,6 +42,22 @@ The list API adds `area`, `phone` (shared numbers only), `seatsLeft` (drivers) a
 driver a rider has a seat with); on your own entry, `alerts` and `lostRide`. `GET /rsvps` also
 returns `pushKey`, the public VAPID key the app needs to turn alerts on.
 
+## Plan updates (organizer only)
+
+Only Summan can post. Everyone sees updates in the app (pinned on the home screen and the hike
+page); phones that turned on plan updates also get a notification for hikes they replied
+**Coming** or **Maybe** to.
+
+| Piece | How it works |
+|---|---|
+| Organizer key | The `ORGANIZER_KEY` secret. `POST /organizer/link` (with the key) sends Summan's ntfy channel a private link, `…/#/organizer?k=<key>`. Opening it saves the key on that phone and takes it out of the address bar; a 📣 button then opens the organizer screen. Every organizer request sends the key in `X-Organizer`; it's compared in constant time. New key = old links stop working. |
+| Posting | `POST /updates {"hike": "<id>" or "", "text": "…", "urgent": true?}`: up to 300 characters, line breaks kept; only hikes that aren't over; the same text twice within 2 minutes is refused. `DELETE /updates/<id>` takes one down (notifications already sent stay). `GET /organizer` shows reach per hike (`people` replied Coming/Maybe, `phones` with notifications on) and past updates with how many phones got each. |
+| Opt-in | `PUT /notify` with the phone's PushSubscription (needs at least one reply); `DELETE /notify` stops it. One sign-up per phone, for every hike it replies Coming or Maybe to. The app asks once after a reply. |
+| Sending | Notifications are queued and sent by the Durable Object's alarm, 40 per run, so a run never passes the free plan's 50 outgoing calls. A phone the push service says is gone (404/410) is forgotten. |
+| Clean-up | Hike updates go a week after the hike; updates to everyone two weeks after they're sent. Sign-ups go when the phone has no replies left. |
+
+The app's only two notifications are ride requests (drivers who turned them on) and these plan updates.
+
 ## Deploy
 
 With a Cloudflare API token that has the **Edit Cloudflare Workers** permissions (the same
@@ -65,12 +81,25 @@ node -e 'const e=require("crypto").createECDH("prime256v1");e.generateKeys();con
 
 Changing the pair later means drivers turn alerts on again (the app re-subscribes when they do).
 
+The organizer key, and sending the organizer link to Summan's ntfy channel (the key is never shown):
+
+```bash
+openssl rand -base64 32 | tr '+/' '-_' | tr -d '=\n' > organizer.key
+npx wrangler secret put ORGANIZER_KEY < organizer.key
+curl -X POST https://fall-hike-rsvp.<your-subdomain>.workers.dev/organizer/link \
+  -H "Origin: https://fallhike.pages.dev" -H "X-Organizer: $(cat organizer.key)"
+rm organizer.key
+```
+
+Lost phone? Run the same steps: the new key replaces the old one, and the old link stops working.
+
 | Name | Where | What |
 |---|---|---|
 | `NTFY_TOPIC` | Secret | Your private ntfy channel: an alert for every reply. Use the same channel as the AI Worker. |
 | `ADMIN_SECRET` | Secret | Any long random text. Signs the **Remove reply** links in alerts, so nobody else can make one. |
 | `VAPID_PRIVATE_KEY` | Secret | Private half of the ride-alert key pair (base64url, 32 bytes). Without it, ride alerts are off and the app hides the option. |
 | `VAPID_PUBLIC_KEY` | `[vars]` in `wrangler.toml` | Public half (base64url, 65 bytes). Not secret. |
+| `ORGANIZER_KEY` | Secret | Long random text that unlocks posting plan updates. Without it, nobody can post. |
 | `ALLOWED_ORIGIN` | `[vars]` in `wrangler.toml` | `https://fallhike.pages.dev,https://rmbk18.github.io` (origins only, no path) |
 | `APP_URL` | `[vars]` in `wrangler.toml` | The app's address, for the **Open hike** button in alerts |
 
@@ -98,11 +127,16 @@ alert sign-ups. It waits when it hits the rate limit, so it takes a few minutes.
 `node test-webpush.mjs` checks the push encryption against the RFC 8291 test vector and the
 VAPID signature, with no network.
 
+With `ORGANIZER_KEY=… node test.mjs <url>` it also checks plan updates: the key is required,
+posting to the hidden test hike, reach counts, the double-tap check, and taking an update down.
+On the live Worker no notification is sent for the test hike.
+
 Local: `npx wrangler dev` then `LOCAL=1 node test.mjs http://localhost:8787`. LOCAL=1 also runs
 a mock push service and a mock ntfy, to check the notification a driver's phone decrypts and
 that phone numbers never reach Summan's alerts. Put these in `.dev.vars` (never committed):
-`NTFY_TOPIC`, `ADMIN_SECRET`, `NTFY_URL=http://127.0.0.1:8799`, `ALLOW_HTTP_PUSH=1`, and a
-test `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` pair.
+`NTFY_TOPIC`, `ADMIN_SECRET`, `NTFY_URL=http://127.0.0.1:8799`, `ALLOW_HTTP_PUSH=1`, a
+test `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` pair, a test `ORGANIZER_KEY`, and `PUSH_BATCH=2`
+(to check that big groups are sent in batches).
 
 ## Removing a junk reply
 

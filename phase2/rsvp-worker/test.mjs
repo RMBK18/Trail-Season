@@ -7,6 +7,8 @@
 // Writes only to a hidden test hike ("_selftest"): no alerts, not shown in
 // the app, and the test removes its own replies at the end.
 //
+// ORGANIZER_KEY=… (env) also checks posting plan updates, to the test hike only.
+//
 // LOCAL=1 (local Worker only) also runs a mock push service and a mock ntfy,
 // to check the ride alert a driver's phone gets and that phone numbers never
 // reach the organizer's alerts. Start the Worker with .dev.vars holding
@@ -262,6 +264,67 @@ try {
     console.log('NOTE  Ride alerts are not set up (no VAPID keys), so their checks were skipped');
   }
 
+  // 9. Plan updates: only the organizer posts; Coming + Maybe phones that opted in are notified
+  const ORG = process.env.ORGANIZER_KEY || '';
+  const org = async (method, path, body, key = ORG) => {
+    for (let attempt = 0; ; attempt++) {
+      const r = await fetch(base + path, {
+        method, headers: { Origin: ORIGIN, 'X-Organizer': key, ...(body ? { 'Content-Type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined,
+      });
+      const data = await r.json().catch(() => ({}));
+      if (r.status !== 429 || attempt === 3) return { status: r.status, data };
+      await sleep((Number(r.headers.get('Retry-After')) || 60) * 1000 + 1000); // rate limit: wait, then retry
+    }
+  };
+  check('Plan updates: posting without the organizer key is refused', (await org('POST', '/updates', { hike: HIKE, text: 'Hacked' }, '')).status === 403);
+  check('…and with a wrong key', (await org('POST', '/updates', { hike: HIKE, text: 'Hacked' }, 'x'.repeat(43))).status === 403);
+  check('…and the organizer view too', (await org('GET', '/organizer', undefined, 'nope-nope-nope-nope-nope')).status === 403);
+  const UC = newDevice(), UM = newDevice(), UX = newDevice(), UN = newDevice();
+  cleanup.push(UC, UM, UX, UN);
+  const uk = () => { const e = nodeCrypto.createECDH('prime256v1'); e.generateKeys(); return { ecdh: e, auth: nodeCrypto.randomBytes(16) }; };
+  const notifyBody = (k, endpoint) => ({ endpoint, keys: { p256dh: k.ecdh.getPublicKey('base64url'), auth: k.auth.toString('base64url') } });
+  const kC = uk(), kM = uk(), kX = uk();
+  check('Plan updates: a phone with no reply can\'t sign up', (await call('PUT', '/notify', { device: UC, body: notifyBody(kC, 'https://fcm.googleapis.com/fcm/send/t1') })).data.error === 'no_reply');
+  await put(UC, { name: `Update Coming ${RUN}`, status: 'coming' });
+  await put(UM, { name: `Update Maybe ${RUN}`, status: 'maybe' });
+  await put(UX, { name: `Update Cant ${RUN}`, status: 'cant' });
+  await put(UN, { name: `Update NoAlerts ${RUN}`, status: 'coming' });
+  const pushBase = process.env.LOCAL === '1' ? 'http://127.0.0.1:8799/push' : 'https://fcm.googleapis.com/fcm/send';
+  check('…other websites can\'t be used as the push address', (await call('PUT', '/notify', { device: UC, body: notifyBody(kC, 'https://evil.example/x') })).status === 400);
+  const on = await call('PUT', '/notify', { device: UC, body: notifyBody(kC, `${pushBase}/uc-${RUN}`) });
+  check('Plan updates: a phone that replied signs up', on.status === 200 && on.data.updates === true, `${on.status} ${on.data.error ?? ''}`);
+  await call('PUT', '/notify', { device: UM, body: notifyBody(kM, `${pushBase}/um-${RUN}`) });
+  await call('PUT', '/notify', { device: UX, body: notifyBody(kX, `${pushBase}/ux-${RUN}`) });
+  const allMe = await call('GET', '/rsvps', { device: UC });
+  check('…the lists say this phone gets updates', allMe.data.me?.updates === true && Array.isArray(allMe.data.updates));
+  check('…another phone doesn\'t', (await call('GET', '/rsvps', { device: UN })).data.me?.updates === false);
+  if (ORG) {
+    const view = await org('GET', '/organizer');
+    check('Organizer view: reach for everyone and each upcoming hike', view.status === 200 && typeof view.data.everyone?.people === 'number' && typeof view.data.hikes === 'object', `${view.status}`);
+    check('Organizer: empty update refused', (await org('POST', '/updates', { hike: HIKE, text: '   ' })).status === 400);
+    check('Organizer: over 300 characters refused', (await org('POST', '/updates', { hike: HIKE, text: 'x'.repeat(301) })).status === 400);
+    check('Organizer: unknown hike refused', (await org('POST', '/updates', { hike: 'nope', text: 'Hi' })).status === 404);
+    const text = `Test update ${RUN}: meet at 9:00 instead of 8:00.\n\n\n\nSee you there!\u200b`;
+    const p1 = await org('POST', '/updates', { hike: HIKE, text });
+    check('Organizer posts an update to one hike', p1.status === 200 && p1.data.update?.id, `${p1.status} ${p1.data.error ?? ''}`);
+    check('…text cleaned: line breaks kept (one blank line max), invisible characters dropped', p1.data.update?.text === `Test update ${RUN}: meet at 9:00 instead of 8:00.\n\nSee you there!`, JSON.stringify(p1.data.update?.text));
+    const goingNow = (await list(UN)).filter((e) => e.status !== 'cant').length; // other test replies may be on the test hike too
+    check('…reaches every Coming + Maybe reply, and the 2 phones with updates on (not the "can\'t")', p1.data.people === goingNow && p1.data.phones === 2, `${p1.data.people} of ${goingNow} people, ${p1.data.phones} phones`);
+    check('Sending it again right away is caught as a double tap', (await org('POST', '/updates', { hike: HIKE, text })).data.error === 'duplicate');
+    const seen = await call('GET', `/rsvps/${HIKE}`, { device: UN });
+    check('Everyone sees the update with that hike\'s list', seen.data.updates?.some((u) => u.id === p1.data.update.id && u.hike === HIKE && u.urgent === false));
+    check('…the test hike\'s updates stay out of the app\'s main list', !(await call('GET', '/rsvps', { device: UN })).data.updates.some((u) => u.hike === HIKE));
+    check('…and out of the organizer\'s history', !(await org('GET', '/organizer')).data.updates.some((u) => u.id === p1.data.update.id));
+    if (process.env.LOCAL === '1') await localUpdateChecks(org, p1.data.update, { kC, kM, kX }, { UC, UM, UX, UN });
+    const del = await org('DELETE', `/updates/${p1.data.update.id}`);
+    check('Organizer takes the update down', del.status === 200 && del.data.removed === true && !(await call('GET', `/rsvps/${HIKE}`, { device: UN })).data.updates.some((u) => u.id === p1.data.update.id));
+  } else {
+    console.log('NOTE  ORGANIZER_KEY not given, so posting checks were skipped');
+  }
+  const offU = await call('DELETE', '/notify', { device: UC });
+  check('Plan updates: a phone turns them off', offU.status === 200 && offU.data.updates === false);
+  for (const dev of [UC, UM, UX, UN]) await call('DELETE', `/rsvps/${HIKE}`, { device: dev });
+
   if (process.env.LOCAL === '1') await localChecks();
 
   for (const dev of everyone) await call('DELETE', `/rsvps/${HIKE}`, { device: dev });
@@ -271,6 +334,89 @@ try {
   failed++;
 } finally {
   for (const dev of cleanup) await call('DELETE', `/rsvps/${HIKE}`, { device: dev }).catch(() => {});
+}
+
+// ── LOCAL=1: plan update notifications through the mock push service ──
+function decryptPush(b, ecdh, auth) {
+  const asPublic = b.subarray(21, 21 + b[20]);
+  const shared = ecdh.computeSecret(asPublic);
+  const ikm = Buffer.from(nodeCrypto.hkdfSync('sha256', shared, auth, Buffer.concat([Buffer.from('WebPush: info\0'), ecdh.getPublicKey(), asPublic]), 32));
+  const salt = b.subarray(0, 16);
+  const cek = Buffer.from(nodeCrypto.hkdfSync('sha256', ikm, salt, Buffer.from('Content-Encoding: aes128gcm\0'), 16));
+  const nonce = Buffer.from(nodeCrypto.hkdfSync('sha256', ikm, salt, Buffer.from('Content-Encoding: nonce\0'), 12));
+  const data = b.subarray(21 + b[20]);
+  const d = nodeCrypto.createDecipheriv('aes-128-gcm', cek, nonce);
+  d.setAuthTag(data.subarray(data.length - 16));
+  const plain = Buffer.concat([d.update(data.subarray(0, data.length - 16)), d.final()]);
+  return JSON.parse(plain.subarray(0, plain.lastIndexOf(2)).toString());
+}
+
+async function localUpdateChecks(org, update, keys, devs) {
+  const got = [];
+  let status = 201;
+  const mock = http.createServer((req, res) => {
+    const chunks = [];
+    req.on('data', (c) => chunks.push(c));
+    req.on('end', () => { if (req.url.startsWith('/push/')) got.push({ url: req.url, body: Buffer.concat(chunks), ttl: req.headers.ttl }); res.writeHead(status); res.end(); });
+  });
+  await new Promise((r) => mock.listen(8799, '127.0.0.1', r));
+  try {
+    // The update above was queued before this mock started listening; post a fresh one.
+    const u2 = await org('POST', '/updates', { hike: HIKE, text: `Cancelled ${RUN}: heavy rain.`, urgent: true });
+    for (let i = 0; i < 40 && got.length < 2; i++) await sleep(250);
+    const paths = got.map((g) => g.url.split('/').pop().split('-')[0]).sort().join(',');
+    check('LOCAL  Update notifies the Coming and Maybe phones only', got.length === 2 && paths === 'uc,um', paths);
+    const c = got.find((g) => g.url.includes('/uc-'));
+    if (c) {
+      const msg = decryptPush(c.body, keys.kC.ecdh, keys.kC.auth);
+      check('LOCAL  …"⚠️ Urgent update from Summan", with the hike and text', msg.title === '⚠️ Urgent update from Summan' && msg.body === `Test, Self-test: Cancelled ${RUN}: heavy rain.`, `${msg.title} | ${msg.body}`);
+      check('LOCAL  …tapping it opens the hike\'s updates', msg.url === `#/hike/${HIKE}/updates`);
+      check('LOCAL  …kept by the push service for a day if the phone is off', Number(c.ttl) === 86400);
+    }
+    // More phones than one batch: everyone still gets it (PUSH_BATCH=2 in .dev.vars)
+    const extra = [];
+    for (let i = 0; i < 3; i++) {
+      const d = newDevice(); cleanup.push(d); extra.push(d);
+      const e = nodeCrypto.createECDH('prime256v1'); e.generateKeys();
+      await put(d, { name: `Batch ${i} ${RUN}`, status: 'coming' });
+      await call('PUT', '/notify', { device: d, body: { endpoint: `http://127.0.0.1:8799/push/b${i}-${RUN}`, keys: { p256dh: e.getPublicKey('base64url'), auth: nodeCrypto.randomBytes(16).toString('base64url') } } });
+    }
+    got.length = 0;
+    const u3 = await org('POST', '/updates', { hike: HIKE, text: `Batch test ${RUN}` });
+    for (let i = 0; i < 60 && got.length < 5; i++) await sleep(250);
+    check('LOCAL  5 phones, batches of 2: all 5 notified', u3.data.queued === 5 && got.length === 5, `${u3.data.queued} queued, ${got.length} got`);
+    // Phone unsubscribed: forgotten
+    status = 410;
+    got.length = 0;
+    await org('POST', '/updates', { hike: HIKE, text: `Gone test ${RUN}` });
+    for (let i = 0; i < 60 && got.length < 5; i++) await sleep(250);
+    await sleep(500);
+    check('LOCAL  Push service says "gone" (410): that phone\'s sign-up is forgotten', (await call('GET', '/rsvps', { device: devs.UC })).data.me.updates === false);
+    status = 201;
+    // A deleted update that hasn't gone out yet never will
+    for (const d of extra) await call('DELETE', '/notify', { device: d });
+    // Everyone: phones that replied Coming/Maybe to any real hike ahead
+    const real = HIKES[HIKES.length - 1].id;
+    const R = newDevice(); cleanup.push(R);
+    const kr = nodeCrypto.createECDH('prime256v1'); kr.generateKeys(); const ar = nodeCrypto.randomBytes(16);
+    await call('PUT', `/rsvps/${real}`, { device: R, body: { name: `Everyone Test ${RUN}`, status: 'maybe' } });
+    await call('PUT', '/notify', { device: R, body: { endpoint: `http://127.0.0.1:8799/push/ev-${RUN}`, keys: { p256dh: kr.getPublicKey('base64url'), auth: ar.toString('base64url') } } });
+    got.length = 0;
+    const ev = await org('POST', '/updates', { text: `Everyone test ${RUN}` });
+    for (let i = 0; i < 40 && !got.some((g) => g.url.includes('/ev-')); i++) await sleep(250);
+    const evMsg = got.find((g) => g.url.includes('/ev-'));
+    const m2 = evMsg && decryptPush(evMsg.body, kr, ar);
+    check('LOCAL  An update to everyone reaches a Maybe on another hike', Boolean(m2) && m2.title === '📣 Update from Summan' && m2.body === `Everyone test ${RUN}` && m2.url === '#/updates', m2 ? `${m2.title} | ${m2.body} | ${m2.url}` : 'none');
+    const viewNow = await org('GET', '/organizer');
+    const evRow = viewNow.data.updates.find((u) => u.id === ev.data.update.id);
+    check('LOCAL  Organizer history shows it with how many phones got it', evRow && evRow.hike === null && evRow.delivered >= 1, JSON.stringify(evRow));
+    check('LOCAL  …and it shows in everyone\'s app', (await call('GET', '/rsvps', { device: devs.UN })).data.updates.some((u) => u.id === ev.data.update.id && u.hike === null));
+    await org('DELETE', `/updates/${ev.data.update.id}`);
+    await call('DELETE', `/rsvps/${real}`, { device: R });
+    for (const id of [u2.data.update?.id, u3.data.update?.id]) if (id) await org('DELETE', `/updates/${id}`);
+  } finally {
+    mock.close();
+  }
 }
 
 // ── LOCAL=1: mock push service and mock ntfy ────────────────

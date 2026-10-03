@@ -1,15 +1,15 @@
 import { HIKES, BASICS, APP, KIDS_LABELS, hikeById } from './data.js';
 import { esc, mapsUrl, meetMs, endMs, statusOf, nextHike, isHikeDay, countdownParts } from './lib.js';
-import { answer, askLiveAI, isLiveAIOn, rideTarget, DONT_KNOW, FORWARDED, OFF_TOPIC_REPLY, SUGGESTIONS } from './ask.js';
+import { answer, askLiveAI, isLiveAIOn, rideTarget, updateNoteFor, DONT_KNOW, FORWARDED, OFF_TOPIC_REPLY, SUGGESTIONS } from './ask.js';
 import {
   isRsvpLive, setRsvp, removeRsvp, subscribeRsvps, refreshAll, countsFor, myReply, listFor,
   onRsvpChange, onRsvpProblem, RSVP_STATUSES, RSVP_LABELS, MAX_GUESTS, MAX_SEATS,
   requestSeat, cancelSeat, setRideAlerts, pushKey,
+  allUpdates, updateAlertsOn, setUpdateAlerts, organizerKey, setOrganizerKey, clearOrganizerKey, organizerView, postUpdate, deleteUpdate,
 } from './rsvp.js';
 import { AREAS, findArea, areaKm, nearestFirst, normalizePhone, formatPhone, waLink } from './carpool.js';
 import { I } from './icons.js';
 import { getWeather, describeWeather } from './weather.js';
-import { showAdminPanel } from './editor.js';
 import { getHikes } from './admin.js';
 
 // ── Tiny helpers ────────────────────────────────────────────
@@ -238,10 +238,11 @@ function renderHome() {
   $('#view-hikes').innerHTML = `
     <header class="canopy${APP.photo ? ' has-photo' : ''}">
       ${APP.photo ? `<img class="canopy-photo" src="${esc(APP.photo.src)}" alt="" decoding="async">` : ''}
-      <button id="admin-btn" class="glass-btn" type="button" title="Edit hikes" aria-label="Edit hikes">${I.sliders}</button>
+      ${organizerKey() ? `<a id="org-btn" class="glass-btn" href="#/organizer" title="Send an update" aria-label="Send an update">${I.megaphone}</a>` : ''}
       <p class="canopy-eyebrow">${esc(APP.name)}</p>
       <h1 class="large-title">${taglineHTML(APP.tagline || APP.name)}</h1>
       <p class="canopy-sub">${esc(APP.intro || 'Five Saturdays near Toronto, Oct 3 to Oct 31')}</p>
+      <div class="updates-pin" data-updates-pin aria-live="polite" hidden></div>
       ${carpoolBannerHTML(nx)}
       <div class="my-rides" data-my-rides hidden></div>
       <a class="scout-cta" href="#/ask">${I.ask}<span><b>Got a question? Ask Scout.</b><small>Times, fees, parking, trails: it knows the whole plan.</small></span>${I.chevR}</a>
@@ -258,6 +259,7 @@ function renderHome() {
     </section>`;
   fillGoing();
   fillMyRides();
+  fillUpdates();
   if (!homeShown) {
     homeShown = true;
     setTimeout(() => $('#view-hikes .trail')?.classList.remove('rise'), 1200);
@@ -401,6 +403,7 @@ function rsvpFormHTML(h) {
       </div>
       <div class="rsvp-claim" data-rsvp-claim hidden></div>
       <div class="rsvp-claim" data-rsvp-confirm hidden></div>
+      <div class="updates-ask" data-updates-ask hidden></div>
       <button class="btn btn-primary" type="submit" data-rsvp-send>${mine ? 'Update my reply' : 'Send my reply'}</button>
       <button class="btn btn-text" type="button" data-rsvp-remove ${mine ? '' : 'hidden'}>Remove my reply</button>
       <p class="fine">Everyone with the app sees your name. Replies are deleted a week after the hike.</p>
@@ -488,6 +491,8 @@ function renderRsvpList({ list, at, pending }, error) {
     const send = $('[data-rsvp-send]', form);
     if (!send.disabled) send.textContent = mine ? 'Update my reply' : 'Send my reply'; // not while "Sending…"
     syncForm(form);
+    // Replied before plan updates existed: ask once here too (no jump).
+    if (mine && !mine.pending && mine.status !== 'cant' && $('[data-updates-ask]', form).hidden) askAboutUpdates(form, { scroll: false });
   }
   const h = hikeById($('#view-detail').dataset.hike);
   if (h) renderRides(h, list, at, error);
@@ -526,7 +531,7 @@ function alertSupport() {
   return Notification.permission === 'denied' ? 'denied' : 'ok';
 }
 const ALERT_NOTES = {
-  ok: 'Only when someone taps Ride with you. No other notifications, ever.',
+  ok: "One notification when someone taps Ride with you. You'll only get ride requests and Summan's plan updates.",
   'ios-install': 'On iPhone, alerts work once the app is on your Home Screen (iOS 16.4 or later). <button class="link-btn" type="button" data-open-install>How to add it</button>',
   unsupported: "This browser can't show alerts. You'll still see ride requests here when you open the app.",
   denied: "Notifications are blocked for this app in your phone's settings. You'll still see ride requests here.",
@@ -647,6 +652,7 @@ async function sendReply(form, { claim = false, confirmed = false, keepPhone = f
     else {
       toast(savedToast(reply));
       await syncRideAlerts(hikeId, form, reply);
+      if (reply.status !== 'cant') askAboutUpdates(form);
     }
   } catch (err) {
     if (err.code === 'name_taken') {
@@ -751,6 +757,8 @@ function startRsvpSync() {
   onRsvpChange(fillGoing);
   onRsvpChange(fillMyRides);
   onRsvpChange(refreshRideCards);
+  onRsvpChange(fillUpdates);
+  onRsvpChange(fillHikeUpdates);
   onRsvpProblem(({ hikeId, error }) => {
     const h = hikeById(hikeId);
     const why = error.code === 'name_taken' ? `${error.data.name} already replied. Open the hike to confirm it's you.`
@@ -1080,6 +1088,232 @@ function fillMyRides() {
   box.innerHTML = lines.map(([h, text, warn]) => `<a class="my-rides-row${warn ? ' warn' : ''}" href="#/hike/${h.id}/rides" data-push>${I.car}<span>${text}</span>${I.chevR}</a>`).join('');
 }
 
+// ═════════════════════════════════════════════════════════════
+// PLAN UPDATES from the organizer
+// Everyone sees them in the app; phones that turned on plan updates also get a
+// notification for hikes they replied Coming or Maybe to. Only the organizer's
+// phone (unlocked with their private link) can post.
+// ═════════════════════════════════════════════════════════════
+const UPDATE_SHOW_MS = 7 * 24 * 3600 * 1000; // updates to everyone stay pinned a week
+const updateHike = (u) => (u.hike ? hikeById(u.hike) : null);
+// Still relevant: a hike update until the hike is over; an update to everyone for a week.
+const isCurrent = (u, now = Date.now()) => (u.hike ? Boolean(updateHike(u)) && now <= endMs(updateHike(u)) : now - u.at < UPDATE_SHOW_MS);
+const updatesForHike = (hikeId) => allUpdates().filter((u) => u.hike === hikeId || (!u.hike && isCurrent(u)));
+// Replied Coming or Maybe to a hike still ahead: this phone can get updates as notifications.
+const canGetUpdates = () => HIKES.some((h) => Date.now() <= endMs(h) && ['coming', 'maybe'].includes(myReply(h.id)?.status));
+
+function updateItemHTML(u, { withHike = true } = {}) {
+  const h = updateHike(u);
+  return `<li class="update${u.urgent ? ' urgent' : ''}">
+    <p class="update-head">${u.urgent ? I.alert : I.megaphone}<b>${u.urgent ? 'Urgent update' : 'Update'} from ${esc(APP.askPerson)}</b><span>${esc(ago(u.at))}</span></p>
+    ${withHike ? `<p class="update-for">${h ? `<a href="#/hike/${h.id}/updates" data-push>${esc(h.dateShort)}, ${esc(h.shortName)}</a>` : 'For everyone'}</p>` : ''}
+    <p class="update-text">${esc(u.text)}</p>
+  </li>`;
+}
+
+const optInHTML = (label = 'Get Summan\'s updates as notifications') =>
+  isRsvpLive() && pushKey() && !updateAlertsOn() && canGetUpdates() && alertSupport() !== 'unsupported'
+    ? `<button class="update-optin" type="button" data-updates-on>${I.bell}<span>${esc(label)}</span></button>` : '';
+
+// Home: the newest update this phone hasn't closed, pinned at the top.
+function fillUpdates() {
+  const box = $('#view-hikes [data-updates-pin]');
+  if (!box) return;
+  const seen = new Set(store.get('fh:updates-seen', []));
+  const current = allUpdates().filter((u) => isCurrent(u));
+  const fresh = current.filter((u) => !seen.has(u.id));
+  box.hidden = !fresh.length;
+  if (!fresh.length) { box.innerHTML = ''; return; }
+  const u = fresh[0];
+  box.innerHTML = `<ul class="update-list">${updateItemHTML(u)}</ul>
+    <div class="update-actions">
+      <button class="update-btn" type="button" data-update-seen="${esc(u.id)}">Got it</button>
+      ${current.length > 1 ? `<a class="update-btn" href="#/updates">All ${current.length} updates</a>` : ''}
+    </div>
+    ${optInHTML()}`;
+}
+
+// Hike page: that hike's updates (and updates to everyone), newest first.
+function fillHikeUpdates() {
+  const v = $('#view-detail');
+  const box = $('[data-hike-updates]', v);
+  const h = hikeById(v.dataset.hike);
+  if (!box || !h) return;
+  const list = updatesForHike(h.id);
+  box.hidden = !list.length;
+  box.innerHTML = list.length
+    ? `<h2>${I.megaphone}Updates from ${esc(APP.askPerson)}</h2><ul class="update-list">${list.map((u) => updateItemHTML(u, { withHike: !u.hike ? true : false })).join('')}</ul>${optInHTML()}`
+    : '';
+}
+
+function openUpdatesSheet() {
+  const list = allUpdates().filter((u) => isCurrent(u));
+  const status = !isRsvpLive() || !pushKey() ? ''
+    : updateAlertsOn() ? `<p class="fine">${I.bell} You get these as notifications for hikes you replied Coming or Maybe to. <button class="link-btn" type="button" data-updates-off>Turn off</button></p>`
+      : canGetUpdates() ? optInHTML()
+        : '<p class="fine">Reply Coming or Maybe to a hike to get these as notifications.</p>';
+  openSheet('updates', `
+    <span class="sheet-badge" aria-hidden="true">${I.megaphone}</span>
+    <h2 id="sheet-title">Updates from ${esc(APP.askPerson)}</h2>
+    ${list.length ? `<ul class="update-list">${list.map((u) => updateItemHTML(u)).join('')}</ul>` : `<p class="sheet-sub">No updates right now. When ${esc(APP.askPerson)} changes the plan, it shows up here.</p>`}
+    ${status}
+    <button class="btn btn-text" type="button" data-close-sheet>Close</button>`);
+}
+
+// Turn on plan update notifications. Called straight from the tap (Safari needs that).
+async function enableUpdates() {
+  const support = alertSupport();
+  if (support !== 'ok') {
+    if (support === 'ios-install') openInstallSheet();
+    else toast(support === 'denied' ? "Notifications are blocked in your phone's settings." : "This browser can't show notifications.");
+    return false;
+  }
+  const permission = Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission();
+  if (permission !== 'granted') {
+    toast("No notifications, then. You'll still see updates in the app.");
+    return false;
+  }
+  try {
+    await setUpdateAlerts(await pushSubscription());
+    toast(`Done. You'll get ${APP.askPerson}'s plan updates as notifications.`);
+    return true;
+  } catch (err) {
+    toast(err.code === 'no_reply' ? 'Reply to a hike first, then turn on updates.' : err.code === 'network' ? 'No signal. Try again when you have signal.' : `Couldn't turn on notifications: ${err.message}`);
+    return false;
+  }
+}
+
+// After a Coming or Maybe reply: ask once whether they want plan updates.
+function askAboutUpdates(form, { scroll = true } = {}) {
+  const box = $('[data-updates-ask]', form);
+  if (!box || updateAlertsOn() || !pushKey() || store.get('fh:updates-asked', false)) return;
+  const support = alertSupport();
+  if (support === 'unsupported' || support === 'denied') return;
+  box.innerHTML = support === 'ios-install'
+    ? `<p>${I.bell}<span><b>Want ${esc(APP.askPerson)}'s plan updates as notifications?</b> On iPhone, add the app to your Home Screen first (iOS 16.4 or later). You'll still see updates here.</span></p>
+       <div class="btn-row"><button class="btn btn-secondary" type="button" data-open-install>How to add it</button><button class="btn btn-secondary" type="button" data-updates-ask-no>OK</button></div>`
+    : `<p>${I.bell}<span><b>Get plan updates from ${esc(APP.askPerson)}?</b> Time changes, cancellations and other news for the hikes you reply to. Nothing else.</span></p>
+       <div class="btn-row"><button class="btn btn-primary" type="button" data-updates-on>Turn on</button><button class="btn btn-secondary" type="button" data-updates-ask-no>Not now</button></div>`;
+  box.hidden = false;
+  if (scroll) box.scrollIntoView({ block: 'nearest', behavior: reduceMotion() ? 'auto' : 'smooth' });
+}
+
+// ── Organizer screen ──
+const upcomingHikes = () => HIKES.filter((h) => Date.now() <= endMs(h));
+let orgView = null;
+
+function reachText(r) {
+  if (!r) return '';
+  return `${plural(r.people, 'person replied', 'people replied')} Coming or Maybe · ${plural(r.phones, 'phone gets', 'phones get')} notifications`;
+}
+
+function orgHistoryHTML() {
+  const list = orgView?.updates || [];
+  if (!list.length) return '<p class="fine">Nothing sent yet.</p>';
+  return `<ul class="update-list org-history">${list.map((u) => `<li class="update${u.urgent ? ' urgent' : ''}">
+    <p class="update-head"><b>${u.hike && hikeById(u.hike) ? `${esc(hikeById(u.hike).dateShort)}, ${esc(hikeById(u.hike).shortName)}` : 'Everyone'}</b><span>${esc(ago(u.at))}</span></p>
+    <p class="update-text">${esc(u.text)}</p>
+    <p class="fine">${u.phones ? `Notified ${u.delivered} of ${plural(u.phones, 'phone', 'phones')}` : 'No phones to notify'} · in the app for everyone</p>
+    <button class="link-btn" type="button" data-org-delete="${esc(u.id)}">Take it down</button>
+  </li>`).join('')}</ul>`;
+}
+
+async function openOrganizer() {
+  if (!organizerKey()) {
+    openSheet('organizer', `<h2 id="sheet-title">Organizer only</h2><p class="sheet-sub">This screen is only for ${esc(APP.askPerson)}.</p><button class="btn btn-text" type="button" data-close-sheet>Close</button>`);
+    return;
+  }
+  openSheet('organizer', `<h2 id="sheet-title">Send an update</h2><p class="sheet-sub">Loading…</p>`);
+  try {
+    orgView = await organizerView();
+  } catch (err) {
+    if (err.code === 'not_organizer') {
+      clearOrganizerKey();
+      renderHome();
+      openSheet('organizer', `<h2 id="sheet-title">This organizer link isn't valid anymore</h2><p class="sheet-sub">Ask for a new one. Nothing was posted.</p><button class="btn btn-text" type="button" data-close-sheet>Close</button>`);
+    } else {
+      openSheet('organizer', `<h2 id="sheet-title">Send an update</h2><p class="sheet-sub">${err.code === 'network' ? 'No signal right now. Updates need signal to send.' : esc(err.message)}</p><button class="btn btn-text" type="button" data-close-sheet>Close</button>`);
+    }
+    return;
+  }
+  if (sheetKind !== 'organizer') return; // closed while loading
+  const options = upcomingHikes().map((h) => `<option value="${h.id}">${esc(h.dateShort)} · ${esc(h.shortName)}</option>`).join('');
+  openSheet('organizer', `
+    <span class="sheet-badge" aria-hidden="true">${I.megaphone}</span>
+    <h2 id="sheet-title">Send an update</h2>
+    <p class="sheet-sub">Everyone sees it in the app. People who replied Coming or Maybe and turned on notifications get it on their phone.</p>
+    <form class="rsvp-form org-form" data-org-form novalidate>
+      <label class="field"><span>Who it's for</span><select data-org-hike>${options}<option value="">Everyone going to any hike</option></select></label>
+      <p class="fine org-reach" data-org-reach></p>
+      <label class="field"><span>Update</span><textarea data-org-text maxlength="300" rows="4" placeholder="e.g. We're meeting at 9:00 instead of 8:00."></textarea></label>
+      <p class="fine org-count" data-org-count>0 / 300</p>
+      <label class="check check-sm"><input type="checkbox" data-org-urgent><span class="box">${I.check}</span><span class="check-label">Urgent (shown in red, e.g. cancelled or moved)</span></label>
+      <div class="rsvp-claim" data-org-confirm hidden></div>
+      <button class="btn btn-primary" type="submit" data-org-send>${I.megaphone}<span>Send update</span></button>
+    </form>
+    <div class="org-result" data-org-result hidden></div>
+    <h3 class="sub-h">Sent updates</h3>
+    <div data-org-history>${orgHistoryHTML()}</div>
+    <p class="fine">Organizer mode is on for this phone only. <button class="link-btn" type="button" data-org-signout>Turn it off</button></p>
+    <button class="btn btn-text" type="button" data-close-sheet>Close</button>`);
+  syncOrgForm();
+}
+
+function syncOrgForm() {
+  const form = $('[data-org-form]');
+  if (!form) return;
+  const hikeId = $('[data-org-hike]', form).value;
+  $('[data-org-reach]', form).textContent = reachText(hikeId ? orgView?.hikes?.[hikeId] : orgView?.everyone);
+  $('[data-org-count]', form).textContent = `${[...$('[data-org-text]', form).value].length} / 300`;
+}
+
+function orgDraft(form) {
+  const hikeId = $('[data-org-hike]', form).value;
+  return { hike: hikeId, text: $('[data-org-text]', form).value.trim(), urgent: $('[data-org-urgent]', form).checked };
+}
+
+// Step 1: say exactly who it goes to. Step 2 (Send now): post it.
+function confirmUpdate(form) {
+  const d = orgDraft(form);
+  if (!d.text) { toast('Write the update first'); return $('[data-org-text]', form).focus(); }
+  const h = d.hike ? hikeById(d.hike) : null;
+  const r = d.hike ? orgView?.hikes?.[d.hike] : orgView?.everyone;
+  const box = $('[data-org-confirm]', form);
+  box.innerHTML = `<p>Send ${d.urgent ? '<b>an urgent update</b>' : 'this update'} to <b>${h ? `everyone going to ${esc(h.dateShort)}, ${esc(h.shortName)}` : 'everyone going to any hike'}</b>? ${r ? `${plural(r.phones, 'phone gets', 'phones get')} a notification; ` : ''}everyone sees it in the app.</p>
+    <div class="btn-row"><button class="btn btn-primary" type="button" data-org-go>Send now</button><button class="btn btn-secondary" type="button" data-org-edit>Edit</button></div>`;
+  box.hidden = false;
+  box.scrollIntoView({ block: 'nearest', behavior: reduceMotion() ? 'auto' : 'smooth' });
+}
+
+function whatsappUpdateText(u) {
+  const h = updateHike(u);
+  return `${u.urgent ? '⚠️ Urgent update' : '📣 Update'} from ${APP.askPerson}${h ? ` (${h.dateShort}, ${h.shortName})` : ''}:\n${u.text}\n\n${appUrl()}${h ? `#/hike/${h.id}/updates` : '#/updates'}`;
+}
+
+async function sendUpdate(form, btn) {
+  const d = orgDraft(form);
+  btn.disabled = true;
+  btn.textContent = 'Sending…';
+  try {
+    const res = await postUpdate(d);
+    const missed = Math.max(0, res.people - res.phones);
+    form.reset();
+    $('[data-org-confirm]', form).hidden = true;
+    syncOrgForm();
+    const out = $('[data-org-result]');
+    out.innerHTML = `<p><b>Sent.</b> ${res.queued ? `${plural(res.queued, 'phone is', 'phones are')} getting a notification.` : 'No phones to notify yet.'} It's in the app for everyone.${missed ? ` ${plural(missed, 'person who replied doesn\'t', 'people who replied don\'t')} have notifications on.` : ''}</p>
+      <a class="btn btn-secondary" href="${esc(`https://wa.me/?text=${encodeURIComponent(whatsappUpdateText(res.update))}`)}" target="_blank" rel="noopener">${I.chat}<span>Also post to WhatsApp group</span></a>`;
+    out.hidden = false;
+    out.scrollIntoView({ block: 'nearest', behavior: reduceMotion() ? 'auto' : 'smooth' });
+    orgView = await organizerView().catch(() => orgView);
+    $('[data-org-history]').innerHTML = orgHistoryHTML();
+  } catch (err) {
+    toast(err.code === 'duplicate' ? 'You just sent that update.' : err.code === 'network' ? 'No signal. Your update wasn\'t sent; try again.' : err.message || "Couldn't send the update.");
+  } finally {
+    if (btn.isConnected) { btn.disabled = false; btn.textContent = 'Send now'; }
+  }
+}
+
 function replyText(h, name, status) {
   const verb = status === 'maybe' ? "I'm a maybe" : status === 'cant' ? "I can't make it" : "I'm in";
   return `🍂 Hi everyone, this is ${name} — ${verb} for ${h.dateShort} at ${h.park}! Meet ${h.meet.time}${h.meet.place ? ` at ${h.meet.place}` : ''}.`;
@@ -1163,6 +1397,8 @@ function renderDetail(h) {
 
       ${alertsHTML(h)}
 
+      <section class="block block-updates" id="updates" data-hike-updates hidden></section>
+
       <section class="block" data-weather aria-live="polite">
         <p class="muted">Loading weather…</p>
       </section>
@@ -1237,6 +1473,8 @@ function renderDetail(h) {
 
       ${h.photo ? `<p class="photo-credit">${photoCredit(h.photo)}</p>` : ''}
     </div>`;
+
+  fillHikeUpdates();
 
   // Show the park name in the nav bar once the big title scrolls away
   const title = $('.hero-title', v);
@@ -1350,6 +1588,8 @@ async function ask(question) {
   if (ai?.answer) {
     const el = addMsg('bot', ai.answer);
     el.insertAdjacentHTML('beforeend', '<p class="msg-fine">Live answer, from the hike plan</p>');
+    // The AI only knows the written plan, so show any newer update from the organizer too.
+    el.insertAdjacentHTML('beforeend', updateNoteFor(q));
     if (ai.rideHelp) el.insertAdjacentHTML('beforeend', ridesCardFor(rideTarget(q)));
     return;
   }
@@ -1549,19 +1789,40 @@ function closeDetail(animate) {
 
 function route(animate = false) {
   const hash = location.hash || '#/';
-  const m = hash.match(/^#\/hike\/([\w-]+)(?:\/(rsvp|rides|needride))?/);
+  const m = hash.match(/^#\/hike\/([\w-]+)(?:\/(rsvp|rides|needride|updates))?/);
   const h = m && hikeById(m[1]);
   if (h) {
     showTab('hikes');
     openDetail(h, animate);
     if (m[2] === 'needride') prefillNeedRide(h);
+    // From a notification: fetch the newest updates, then land on them.
+    if (m[2] === 'updates' && isRsvpLive()) {
+      refreshAll().catch(() => { /* no signal: saved updates show */ }).finally(() => {
+        if (detailOpen && $('#view-detail').dataset.hike === h.id) $('#updates:not([hidden])')?.scrollIntoView({ block: 'start', behavior: 'auto' });
+      });
+    }
     if (m[2]) {
-      requestAnimationFrame(() => $(m[2] === 'rides' ? '#rides' : '#rsvp')?.scrollIntoView({ block: 'start', behavior: animate && !reduceMotion() ? 'smooth' : 'auto' }));
+      const target = { rides: '#rides', updates: '#updates' }[m[2]] || '#rsvp';
+      requestAnimationFrame(() => $(target)?.scrollIntoView({ block: 'start', behavior: animate && !reduceMotion() ? 'smooth' : 'auto' }));
     }
     return;
   }
   closeDetail(animate);
   showTab(hash.startsWith('#/ask') ? 'ask' : hash.startsWith('#/share') ? 'share' : 'hikes');
+  // The organizer's private link: keep the key on this phone, then take it out of the address bar.
+  const key = hash.match(/^#\/organizer\?k=([A-Za-z0-9_-]{20,200})/);
+  if (key) {
+    setOrganizerKey(key[1]);
+    location.replace('#/organizer');
+    renderHome();
+    return;
+  }
+  if (hash.startsWith('#/organizer')) { openOrganizer(); return; }
+  if (hash.startsWith('#/updates')) {
+    openUpdatesSheet();
+    if (isRsvpLive()) refreshAll().then(() => { if (sheetKind === 'updates') openUpdatesSheet(); }).catch(() => {});
+    return;
+  }
   // #/ask?q=… asks Scout that question (e.g. from the carpool banner)
   const q = hash.match(/^#\/ask\?q=(.+)$/);
   if (q) {
@@ -1746,6 +2007,66 @@ document.addEventListener('click', async (e) => {
     return;
   }
   if (t.matches('[data-ride-with]')) return rideWith(t.dataset.hike, t.dataset.rideWith);
+  // ── Plan updates ──
+  if (t.matches('[data-updates-on]')) {
+    store.set('fh:updates-asked', true);
+    const ok = await enableUpdates();
+    $$('[data-updates-ask]').forEach((el) => { if (ok) el.hidden = true; });
+    if (sheetKind === 'updates') openUpdatesSheet();
+    return;
+  }
+  if (t.matches('[data-updates-off]')) {
+    try {
+      await setUpdateAlerts(null);
+      toast('Plan update notifications are off. You\'ll still see updates in the app.');
+    } catch (err) {
+      toast(err.code === 'network' ? 'No signal. Try again when you have signal.' : err.message);
+    }
+    if (sheetKind === 'updates') openUpdatesSheet();
+    return;
+  }
+  if (t.matches('[data-updates-ask-no]')) {
+    store.set('fh:updates-asked', true);
+    t.closest('[data-updates-ask]').hidden = true;
+    return;
+  }
+  if (t.matches('[data-update-seen]')) {
+    store.set('fh:updates-seen', [t.dataset.updateSeen, ...store.get('fh:updates-seen', [])].slice(0, 50));
+    fillUpdates();
+    return;
+  }
+  // ── Organizer ──
+  if (t.matches('[data-org-go]')) return sendUpdate(t.closest('[data-org-form]'), t);
+  if (t.matches('[data-org-edit]')) {
+    t.closest('[data-org-confirm]').hidden = true;
+    $('[data-org-text]').focus();
+    return;
+  }
+  if (t.matches('[data-org-delete]')) {
+    if (t.dataset.armed !== 'true') {
+      t.dataset.armed = 'true';
+      t.textContent = 'Tap again to take it down for everyone';
+      return;
+    }
+    t.disabled = true;
+    try {
+      await deleteUpdate(t.dataset.orgDelete);
+      orgView = { ...orgView, updates: (orgView?.updates || []).filter((u) => u.id !== t.dataset.orgDelete) };
+      $('[data-org-history]').innerHTML = orgHistoryHTML();
+      toast('Taken down. Notifications already sent stay on people\'s phones.');
+    } catch (err) {
+      t.disabled = false;
+      toast(err.code === 'network' ? 'No signal. Try again when you have signal.' : err.message);
+    }
+    return;
+  }
+  if (t.matches('[data-org-signout]')) {
+    clearOrganizerKey();
+    closeSheet();
+    renderHome();
+    toast('Organizer mode is off on this phone. Open your organizer link to turn it back on.');
+    return;
+  }
   if (t.matches('[data-cancel-seat], [data-lost-ok]')) {
     const hikeId = t.dataset.cancelSeat || t.dataset.lostOk;
     const ride = myReply(hikeId)?.ride;
@@ -1835,6 +2156,7 @@ document.addEventListener('input', (e) => {
   if (form) form.dataset.dirty = 'true';
   const sheet = e.target.closest?.('[data-ride-sheet]');
   if (sheet) syncRideSheet(sheet);
+  if (e.target.closest?.('[data-org-form]')) syncOrgForm();
 });
 
 document.addEventListener('change', (e) => {
@@ -1852,6 +2174,7 @@ document.addEventListener('change', (e) => {
     if (e.target.matches('[data-rsvp-area]') && e.target.value === 'Other') $('[data-rsvp-area-other]', form).focus();
     return;
   }
+  if (e.target.matches?.('[data-org-hike]')) { syncOrgForm(); return; }
   if (sheet) {
     syncRideSheet(sheet);
     if (e.target.matches('[data-rsvp-area]') && e.target.value === 'Other') $('[data-rsvp-area-other]', sheet).focus();
@@ -1873,6 +2196,11 @@ document.addEventListener('submit', (e) => {
   if (e.target.matches('[data-ride-sheet]')) {
     e.preventDefault();
     submitRideSheet(e.target);
+    return;
+  }
+  if (e.target.matches('[data-org-form]')) {
+    e.preventDefault();
+    confirmUpdate(e.target);
     return;
   }
   if (e.target.id !== 'ask-form') return;

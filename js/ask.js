@@ -7,7 +7,7 @@
 import { HIKES, BASICS, APP, GROUP } from './data.js';
 import { CONFIG } from './config.js';
 import { esc, mapsUrl, nextHike, torontoDateISO, endMs } from './lib.js';
-import { isRsvpLive, countsFor } from './rsvp.js';
+import { isRsvpLive, countsFor, allUpdates } from './rsvp.js';
 import { AREAS } from './carpool.js';
 
 export const DONT_KNOW = `I don't know that one — ask ${APP.askPerson}!`;
@@ -136,7 +136,8 @@ const TOPICS = [
   { id: 'emergency', kws: ['emergency', '911', 'ambulance', 'injured', 'injury', 'accident', 'bleeding', 'broken leg', 'broken arm', 'broke my', 'sprained', "i'm lost", 'im lost', 'i am lost', 'we are lost', "we're lost", 'were lost', 'got lost'] },
   { id: 'cancel', kws: ['cancel', 'cancels', 'cancelled', 'canceled', 'cancellation', 'postpone', 'postponed', 'reschedule', 'rescheduled', 'rain or shine', 'rain date', 'rain plan', 'if it rains', "if it's raining", 'if its raining', 'in the rain', 'bad weather', 'still on', 'still happening', 'called off', 'call it off'] },
   { id: 'carpool', kws: ['carpool', 'carpools', 'carpooling', 'car pool', 'rideshare', 'ride share', 'need a ride', 'need ride', 'get a ride', 'give me a ride', 'give a ride', 'a lift', 'lift to', 'who is driving', "who's driving", 'whos driving', 'spare seat', 'spare seats', 'empty seat', 'empty seats', 'free seat', 'free seats', 'my seat', 'a seat', 'seats left', 'pick me up', 'drive me', 'any drivers', 'anyone driving', 'who can drive', 'can someone drive', 'can anyone drive', 'looking for a ride', 'ride with', 'riding with', 'offer a ride', 'offer seats', 'offer rides', 'rides', 'whatsapp', 'ride alerts', 'no car', "don't have a car", 'dont have a car', 'without a car', "i don't drive", 'i dont drive', "i can't drive", 'i cant drive'] },
-  { id: 'rsvp', kws: ['rsvp', 'who is coming', "who's coming", 'whos coming', 'who is going', "who's going", 'whos going', 'attending', 'sign up', 'signup', 'count me in', 'headcount', "i'm in", 'im in', 'how many people', 'how many of us', 'who else'] },
+  { id: 'updates', kws: ['updates', 'any update', 'an update', 'latest update', 'news', 'any news', 'announcement', 'announcements', 'any changes', 'plan change', 'plan changed', 'change of plan', 'change of plans', 'changes to the plan', 'what changed'] },
+  { id: 'rsvp', kws: ['rsvp', 'who is coming', "who's coming", 'whos coming', 'who is going', "who's going", 'whos going', 'attending', 'sign up', 'signup', 'count me in', 'headcount', 'my reply', 'my rsvp', 'change my reply', 'update my reply', 'remove my reply', "i'm in", 'im in', 'how many people', 'how many of us', 'who else'] },
   { id: 'ticks', kws: ['tick', 'ticks', 'lyme'] },
   { id: 'kids', kws: ['kid', 'kids', 'child', 'children', 'toddler', 'toddlers', 'baby', 'babies', 'little one', 'little ones', 'son', 'daughter', 'family', 'families', 'family-friendly', 'family friendly'] },
   { id: 'access', kws: ['wheelchair', 'stroller', 'strollers', 'accessible', 'accessibility', 'barrier-free', 'barrier free', 'mobility'] },
@@ -216,6 +217,30 @@ const rsvpList = (hikes) => {
   return list(hikes.map(line)) + hikes.slice(0, 2).map((h) => `<a class="ans-link ans-link-soft" href="#/hike/${esc(h.id)}/rsvp">Reply for ${esc(h.dateShort.replace('Sat ', ''))}</a>`).join('');
 };
 const dontKnow = () => `<p>${esc(DONT_KNOW)}</p>`;
+
+// ── Plan updates from the organizer (from the live list) ──
+// A hike's updates count until the hike is over; updates to everyone for a week.
+const UPDATE_NOTE_MS = 7 * 24 * 3600 * 1000;
+const agoText = (ms) => {
+  const min = Math.round(ms / 60000);
+  return min < 1 ? 'just now' : min < 60 ? `${min} min ago` : min < 1440 ? `${Math.round(min / 60)} h ago` : `${Math.round(min / 1440)} days ago`;
+};
+const currentUpdate = (u, now) => (u.hike ? HIKES.some((h) => h.id === u.hike && now <= endMs(h)) : now - u.at < UPDATE_NOTE_MS);
+const hikeUpdates = (h, now) => allUpdates().filter((u) => u.hike === h.id || (!u.hike && now - u.at < UPDATE_NOTE_MS));
+const updateLine = (u, now) =>
+  `<p class="ans-update${u.urgent ? ' urgent' : ''}"><b>${u.urgent ? '⚠️ Urgent update' : '📣 Update'} from ${esc(APP.askPerson)}</b> (${agoText(now - u.at)}): ${esc(u.text)}</p>`;
+function notesFor(hikes, now) {
+  const seen = new Set();
+  const list = [];
+  for (const h of hikes) for (const u of hikeUpdates(h, now)) if (!seen.has(u.id)) { seen.add(u.id); list.push(u); }
+  return list.slice(0, 3).map((u) => updateLine(u, now)).join('');
+}
+
+/** The organizer's latest updates for the hike a question is about (or the next hike), as HTML. */
+export function updateNoteFor(raw, now = new Date()) {
+  const { hikes } = detectHikes(norm(raw), now);
+  return notesFor(hikes.length ? hikes : [nextHike(now)].filter(Boolean), now.getTime());
+}
 const notInPlan = (what, h) => `<p>The plan doesn't list ${what} at ${esc(h.park)}.</p>` + dontKnow();
 
 const trailLine = (t) => {
@@ -354,7 +379,7 @@ const ANSWERS = {
         'Reply <b>Coming</b>, pick <b>I can drive</b> or <b>Need a ride</b>, and your area.',
         'Riders see drivers from their area first. Tap <b>Message</b> to WhatsApp a driver, or <b>Ride with</b> to save a seat. The seats left count down by themselves.',
         'Only one of you needs to share a WhatsApp number: whoever has the other\'s number messages first, and you sort out pickup together.',
-        'Drivers can turn on 🔔 ride alerts: one notification when someone taps Ride with them, nothing else.',
+        'Drivers can turn on 🔔 ride alerts: one notification when someone taps Ride with them.',
         'Plans changed? Tap <b>Cancel my seat</b> any time. If a driver stops driving, their riders are told.',
       ]) + `<p>Sharing your number is optional, and everything is deleted a week after the hike.</p>`
       : `<p>${esc(GROUP.carpool)}</p>`),
@@ -362,6 +387,18 @@ const ANSWERS = {
   swim: { one: () => ANSWERS.swim.all(), all: () => `<p>${esc(GROUP.swim)}</p>` },
   bikes: { one: () => ANSWERS.bikes.all(), all: () => `<p>${esc(GROUP.bikes)}</p>` },
   cell: { one: () => ANSWERS.cell.all(), all: () => `<p>${esc(GROUP.cell)}</p>` },
+  updates: {
+    one: (h) => {
+      const list = hikeUpdates(h, Date.now());
+      return list.length ? list.map((u) => updateLine(u, Date.now())).join('') : `<p>${esc(APP.askPerson)} hasn't posted any updates for ${esc(h.dateShort)}. The plan in the app is the latest.</p>`;
+    },
+    all: () => {
+      const list = allUpdates().filter((u) => currentUpdate(u, Date.now()));
+      return list.length
+        ? list.map((u) => updateLine(u, Date.now()) + (u.hike ? `<p class="msg-fine">For ${esc(HIKES.find((h) => h.id === u.hike)?.dateShort || '')}</p>` : '')).join('')
+        : `<p>No updates from ${esc(APP.askPerson)} right now. The plan in the app is the latest.</p>`;
+    },
+  },
   rsvp: {
     one: (h) => (isRsvpLive() ? rsvpHow + rsvpList([h]) : ANSWERS.rsvp.all()),
     all: () => (isRsvpLive()
@@ -448,8 +485,11 @@ function answerFromPlan(raw, now) {
     else if (strong.includes('fees') && !strong.includes('backup')) strong.splice(strong.indexOf('fees'), 1, 'backup');
   }
 
+  // Answers about a hike also show the organizer's latest update for it (plans change).
+  const notes = strong.includes('updates') ? '' : notesFor(hikes.length ? hikes : ['cancel', 'time', 'where', 'weather'].some((id) => strong.includes(id)) ? [nextHike(now)].filter(Boolean) : [], now.getTime());
+
   if (!strong.length) {
-    if (hikes.length) return { matched: true, html: hikes.slice(0, 2).map(overview).join('<hr>') };
+    if (hikes.length) return { matched: true, html: notes + hikes.slice(0, 2).map(overview).join('<hr>') };
     if (weak.includes('schedule')) return { matched: true, html: schedule() };
     if (weak.includes('greeting')) return { matched: true, html: `<p>Hi, I'm Scout! Ask me about meeting times, fees and booking, dogs, difficulty, drive times, washrooms or what to bring.</p>` };
     if (weak.includes('thanks')) return { matched: true, html: `<p>Anytime. See you on the trail 🍂</p>` };
@@ -485,7 +525,7 @@ function answerFromPlan(raw, now) {
   }
 
   if (!hikes.length) {
-    return { matched: true, html: strong.map((id) => ANSWERS[id].all()).join('') + tail };
+    return { matched: true, html: notes + strong.map((id) => ANSWERS[id].all()).join('') + tail };
   }
 
   const html = hikes
@@ -494,7 +534,7 @@ function answerFromPlan(raw, now) {
       return header + strong.map((id) => ANSWERS[id].one(h)).join('') + open(h);
     })
     .join('<hr>');
-  return { matched: true, html: html + tail };
+  return { matched: true, html: notes + html + tail };
 }
 
 // ═════════════════════════════════════════════════════════════
