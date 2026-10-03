@@ -909,7 +909,8 @@ async function sendOrganizerLink(env) {
     body: JSON.stringify({
       topic: env.NTFY_TOPIC,
       title: 'Fall Hike App: your organizer link',
-      message: 'Open this on your phone to post plan updates from the app. Keep it to yourself: anyone with this link can post as you.',
+      // The link is in the text too, to copy: an iPhone Home Screen app can't be opened by a link.
+      message: `Tap to unlock posting plan updates on this phone. Keep it to yourself: anyone with this link can post as you.\n\nUsing the app from your iPhone Home Screen? Copy this link, then in the app go to Share → Organizer: post a plan update, and paste it:\n${url}`,
       tags: ['loudspeaker'],
       click: url,
       actions: [{ action: 'view', label: 'Unlock organizer', url }],
