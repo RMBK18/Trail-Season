@@ -16,10 +16,10 @@ export const OFF_TOPIC_REPLY = `I can only help with the fall hikes.`;
 
 export const SUGGESTIONS = [
   'What time do we meet on Oct 3?',
-  'How much is Balls Falls?',
+  'How much is Crawford Lake?',
   'Can I bring my dog?',
   'I need a ride',
-  'Parking at Rouge Park?',
+  'Parking at Mount Nemo?',
   'How does carpooling work?',
   'How hard is Rattlesnake Point?',
   'What should I bring?',
@@ -49,25 +49,31 @@ function hasKw(q, kw) {
 const ALIASES = {
   'forks-of-the-credit': ['forks of the credit', 'forks', 'credit', 'caledon', 'kettle lake', 'kettle trail', 'kettle', 'meadow trail', 'cataract falls', 'mono cliffs'],
   'dundas-valley': ['dundas valley', 'dundas peak', 'tew falls', "tew's falls", 'tews falls', 'spencer gorge', 'dundas', 'hermitage ruins', 'hermitage', 'main loop', 'heritage trail', 'trail centre', 'trail center', 'thanksgiving', 'headwaters', 'monarch', 'hilton falls'],
-  'rattlesnake-point': ['rattlesnake point', 'rattlesnake', 'buffalo crag', 'nassagaweya', 'vista adventure', 'appleby line', 'appleby', 'milton', 'mount nemo', 'mt nemo'],
-  'balls-falls': ['balls falls', "ball's falls", 'ball falls', 'balls', 'jordan', 'niagara', 'glen elgin', 'cataract trail', 'upper falls', 'lower falls', 'rock point'],
-  rouge: ['rouge national urban park', 'rouge park', 'rouge valley', 'rouge', 'scarborough', 'twyn rivers', 'vista trail', 'mast trail', 'orchard trail', 'glen rouge', 'zoo road', 'halloween', 'crawford lake'],
+  'rattlesnake-point': ['rattlesnake point', 'rattlesnake', 'buffalo crag', 'nassagaweya', 'vista adventure', 'appleby line', 'appleby', 'milton', 'kelso'],
+  'crawford-lake': ['crawford lake', 'crawford', 'longhouse village', 'longhouse', 'longhouses', 'iroquoian village', 'boardwalk', 'escarpment trail', 'campbellville', 'conservation rd', 'conservation road', 'milton', 'hilton falls'],
+  'mount-nemo': ['mount nemo', 'mt nemo', 'mt. nemo', 'nemo', 'brock harris', 'south loop', 'north loop', 'guelph line', 'burlington', 'halloween', 'kelso'],
+};
+// Parks dropped from the plan: asking about them answers for the park that replaced them.
+const REPLACED = {
+  'crawford-lake': ['Balls Falls', ['balls falls', "ball's falls", 'ball falls']],
+  'mount-nemo': ['Rouge Park', ['rouge national urban park', 'rouge park', 'rouge valley', 'rouge']],
 };
 
-// Phrases removed before topic detection so "Balls Falls" doesn't trigger "falls" (highlights), etc.
+// Phrases removed before topic detection so "Hilton Falls" doesn't trigger "falls" (highlights), etc.
 const NAME_PHRASES = [
-  "ball's falls", 'balls falls', 'ball falls', 'cataract falls', 'upper falls', 'lower falls', 'hilton falls', 'dundas peak', "tew's falls", 'tews falls', 'tew falls', 'spencer gorge',
-  'cataract trail', 'kettle trail', 'meadow trail', 'heritage trail', 'main loop trail', 'main loop', 'buffalo crag trail',
-  'vista adventure trail', 'vista trail', 'mast trail', 'orchard trail', 'trail centre', 'trail center',
-  'forks of the credit', 'rouge national urban park', 'twyn rivers drive', 'twyn rivers', 'zoo road', 'glen rouge',
+  'balls falls', "ball's falls", 'ball falls', 'cataract falls', 'hilton falls', 'dundas peak', "tew's falls", 'tews falls', 'tew falls', 'spencer gorge',
+  'kettle trail', 'meadow trail', 'heritage trail', 'main loop trail', 'main loop', 'buffalo crag trail',
+  'vista adventure trail', 'trail centre', 'trail center', 'forks of the credit',
+  'crawford lake trail', 'crawford lake', 'escarpment trail', 'south loop trail', 'south loop', 'north loop trail', 'north loop',
+  'brock harris lookout', 'brock harris', 'mount nemo', 'mt. nemo', 'mt nemo', 'nassagaweya canyon',
 ];
 
-const BACKUP_NAMES = ['mono cliffs', 'hilton falls', 'mount nemo', 'mt nemo', 'rock point', 'crawford lake', 'headwaters', 'monarch', 'glen rouge', 'dundas peak', 'tew falls', "tew's falls", 'tews falls', 'spencer gorge'];
+const BACKUP_NAMES = ['mono cliffs', 'hilton falls', 'kelso', 'headwaters', 'monarch', 'dundas peak', 'tew falls', "tew's falls", 'tews falls', 'spencer gorge'];
 
 // Carpool: asking for a ride (show the live drivers) vs how it works
 const RIDE_WANTED = ['need a ride', 'need ride', 'get a ride', 'give me a ride', 'a lift', 'lift to', 'pick me up', 'drive me', 'any drivers', 'anyone driving', 'who is driving', "who's driving", 'whos driving', 'who can drive', 'can someone drive', 'can anyone drive', 'looking for a ride', 'no car', "don't have a car", 'dont have a car', 'without a car', "i don't drive", 'i dont drive', "i can't drive", 'i cant drive', 'spare seat', 'spare seats', 'empty seat', 'empty seats', 'free seat', 'free seats', 'seats left', 'rides'];
 const HOW_WORDS = /\b(how|work|works|explain|cancel|offer|alerts?|notifications?|notify|whatsapp|private|privacy|number|delete|deleted|remove)\b/;
-// "a ride from Scarborough": the area someone leaves from, not the Rouge hike
+// "a ride from Milton": the area someone leaves from, not the Milton hikes
 const AREA_KEYS = AREAS.filter((a) => a.lat != null).map((a) => [a.name, a.name.toLowerCase()]);
 function rideArea(q) {
   for (const [name, key] of AREA_KEYS) {
@@ -84,13 +90,13 @@ function detectHikes(q, now) {
   let badDate = null;
   let none = null;
 
-  // "Hilton Falls, Milton" is Dundas's backup, not the Milton hike (Rattlesnake Point).
-  const qa = q.replace(/(hilton falls|crawford lake),?\s*milton/g, '$1');
-  for (const h of HIKES) for (const a of ALIASES[h.id]) if (hasKw(qa, a)) ids.add(h.id);
+  // "Hilton Falls, Milton" is a backup park, not "the Milton hike" (Rattlesnake Point or Crawford Lake).
+  const qa = q.replace(/(hilton falls|kelso|crawford lake|rattlesnake point|rattlesnake),?\s*milton/g, '$1');
+  for (const h of HIKES) for (const a of [...ALIASES[h.id], ...(REPLACED[h.id]?.[1] || [])]) if (hasKw(qa, a)) ids.add(h.id);
 
   let rest = q;
   // "first hike", "3rd weekend", "last one"
-  rest = rest.replace(/\b(first|1st|second|2nd|third|3rd|fourth|4th|fifth|5th|last|final)\s+(hike|hikes|weekend|week|saturday|one|trip|outing)\b/g, (_, o) => {
+  rest = rest.replace(/\b(first|1st|second|2nd|third|3rd|fourth|4th|fifth|5th|last|final)\s+(hike|hikes|weekend|week|saturday|sunday|one|trip|outing)\b/g, (_, o) => {
     ids.add(HIKES[ORDINALS[o] - 1].id);
     return ' ';
   });
@@ -101,17 +107,19 @@ function detectHikes(q, now) {
   });
 
   const days = [];
+  const moved = [];
   rest = rest.replace(/\b(?:oct|october)\.?\s*(\d{1,2})(?:st|nd|rd|th)?\b/g, (_, d) => { days.push(+d); return ' '; });
   rest = rest.replace(/\b10\/(\d{1,2})\b/g, (_, d) => { days.push(+d); return ' '; });
   rest = rest.replace(/\b(\d{1,2})(?:st|nd|rd|th)\b/g, (_, d) => { days.push(+d); return ' '; });
   for (const d of days) {
-    const h = HIKES.find((x) => x.day === d);
+    const h = HIKES.find((x) => x.day === d) || HIKES.find((x) => x.movedFrom?.day === d);
     if (h) ids.add(h.id);
     else badDate = `Oct ${d}`;
+    if (h && h.day !== d) moved.push(h);
   }
 
   // Relative: "next hike", "this weekend", "tomorrow", "today"
-  if (/\b(next|upcoming|this|coming)\s+(hike|weekend|saturday|week|one|trip|outing)\b/.test(q) || /\bcoming up\b/.test(q)) {
+  if (/\b(next|upcoming|this|coming)\s+(hike|weekend|saturday|sunday|week|one|trip|outing)\b/.test(q) || /\bcoming up\b/.test(q)) {
     const nx = nextHike(now);
     if (nx) ids.add(nx.id);
     else none = 'coming up';
@@ -126,7 +134,7 @@ function detectHikes(q, now) {
   }
 
   const hikes = HIKES.filter((h) => ids.has(h.id));
-  return { hikes, badDate: hikes.length ? null : badDate, none: hikes.length ? null : none };
+  return { hikes, badDate: hikes.length ? null : badDate, none: hikes.length ? null : none, moved };
 }
 
 // ── What is the question about? ─────────────────────────────
@@ -158,7 +166,7 @@ const TOPICS = [
   { id: 'bikes', kws: ['bike', 'bikes', 'biking', 'bicycle', 'bicycles', 'cycling', 'cyclist', 'mountain bike', 'mountain biking', 'mtb', 'ebike', 'e-bike', 'scooter'] },
   { id: 'cell', kws: ['cell', 'cell service', 'cellphone', 'signal', 'reception', 'coverage', 'wifi', 'wi-fi', 'lte', '5g', 'data', 'phone service'] },
   { id: 'picnic', kws: ['picnic', 'picnics', 'picnic table', 'picnic tables', 'tables'] },
-  { id: 'schedule', weak: true, kws: ['schedule', 'all hikes', 'all the hikes', 'hikes', 'list', 'dates', 'which weekends', 'what weekends', 'which saturdays', 'plan', 'itinerary', 'calendar', 'overview', 'season'] },
+  { id: 'schedule', weak: true, kws: ['schedule', 'all hikes', 'all the hikes', 'hikes', 'list', 'dates', 'which weekends', 'what weekends', 'which saturdays', 'which days', 'what days', 'plan', 'itinerary', 'calendar', 'overview', 'season'] },
   { id: 'weather', kws: ['weather', 'rain', 'raining', 'rainy', 'snow', 'snowing', 'cold', 'warm', 'hot', 'sunny', 'wind', 'windy', 'forecast', 'temperature', 'temp'] },
   { id: 'greeting', weak: true, kws: ['hi', 'hello', 'hey', 'hiya', 'good morning', 'yo'] },
   { id: 'thanks', weak: true, kws: ['thanks', 'thank you', 'thx', 'ty', 'cheers', 'appreciate it'] },
@@ -203,7 +211,7 @@ function detectTopics(q) {
 const badge = (level) => `<span class="badge badge-${level.toLowerCase()}">${esc(level)}</span>`;
 const list = (items) => `<ul class="ans-list">${items.map((i) => `<li>${i}</li>`).join('')}</ul>`;
 const ext = (url, label) => `<a class="ans-link" href="${esc(url)}" target="_blank" rel="noopener">${esc(label)}</a>`;
-const open = (h) => `<a class="ans-link ans-link-soft" href="#/hike/${esc(h.id)}">Open the ${esc(h.dateShort.replace('Sat ', ''))} hike</a>`;
+const open = (h) => `<a class="ans-link ans-link-soft" href="#/hike/${esc(h.id)}">Open the ${esc(h.dateShort.replace(/^[A-Z][a-z]{2} /, ''))} hike</a>`;
 const who = (h) => `<b>${esc(h.dateShort)}</b>, ${esc(h.shortName)}`;
 
 // RSVP: how to reply, plus the latest counts this phone has seen
@@ -214,7 +222,7 @@ const rsvpList = (hikes) => {
     const n = c.coming + c.maybe + c.cant;
     return `${who(h)}: ${n ? `${c.people} coming, ${c.maybe} maybe` : 'no replies yet'}`;
   };
-  return list(hikes.map(line)) + hikes.slice(0, 2).map((h) => `<a class="ans-link ans-link-soft" href="#/hike/${esc(h.id)}/rsvp">Reply for ${esc(h.dateShort.replace('Sat ', ''))}</a>`).join('');
+  return list(hikes.map(line)) + hikes.slice(0, 2).map((h) => `<a class="ans-link ans-link-soft" href="#/hike/${esc(h.id)}/rsvp">Reply for ${esc(h.dateShort.replace(/^[A-Z][a-z]{2} /, ''))}</a>`).join('');
 };
 const dontKnow = () => `<p>${esc(DONT_KNOW)}</p>`;
 
@@ -316,7 +324,12 @@ const ANSWERS = {
   },
   picnic: {
     one: (h) => (h.picnic ? `<p>Yes, ${esc(h.park)} has ${esc(h.picnic.toLowerCase())}.</p>` : notInPlan('picnic tables', h)),
-    all: () => `<p>The plan lists picnic tables only at Forks of the Credit (Sat Oct 3).</p>`,
+    all: () => {
+      const hikes = HIKES.filter((h) => h.picnic);
+      return hikes.length
+        ? `<p>The plan lists picnic spots at:</p>` + list(hikes.map((h) => `${who(h)}: ${esc(h.picnic)}`))
+        : `<p>The plan doesn't list picnic tables at any of the hikes.</p>`;
+    },
   },
   ticks: {
     one: (h) => {
@@ -413,7 +426,7 @@ const ANSWERS = {
 
 function overview(h) {
   return (
-    `<p><b>${esc(h.dateLong)}</b>: meet ${meetLine(h)}.</p>` +
+    `<p><b>${esc(h.dateLong)}</b>, ${esc(h.park)}: meet ${meetLine(h)}.</p>` +
     `<p>${levelText(h)}. ${h.trails.length > 1 ? 'Trails' : 'Trail'}: ${h.trails.map((t) => esc(t.name)).join(' or ')}.</p>` +
     `<p>${esc(h.fallLine)}</p>` +
     `<p>Drive ${esc(h.drive.text)}. ${esc(h.fee.amount)}.</p>` +
@@ -422,8 +435,11 @@ function overview(h) {
   );
 }
 
+// "Sat Oct 3, Sun Oct 11, … and Sat Oct 31"
+const hikeDays = () => HIKES.map((h) => h.dateShort).join(', ').replace(/, ([^,]*)$/, ' and $1');
+
 function schedule() {
-  return `<p>Five Saturdays:</p>` + list(HIKES.map((h) => `${who(h)}: meet ${esc(h.meet.time)} ${badge(h.level)}`));
+  return `<p>${HIKES.length === 5 ? 'Five weekends' : 'The hikes'}:</p>` + list(HIKES.map((h) => `${who(h)}: meet ${esc(h.meet.time)} ${badge(h.level)}`));
 }
 
 /**
@@ -434,7 +450,21 @@ function schedule() {
  */
 export function answer(raw, now = new Date()) {
   const res = answerFromPlan(raw, now);
-  return { ...res, unsure: res.html.includes(esc(DONT_KNOW)) };
+  const html = (res.matched ? movedNote(raw, now) : '') + res.html;
+  return { ...res, html, unsure: res.html.includes(esc(DONT_KNOW)) };
+}
+
+// Asking about the old plan ("Oct 10", "Balls Falls"): say what changed, then answer for the new one.
+function movedNote(raw, now) {
+  const q = norm(raw);
+  const ra = rideArea(q);
+  const { moved } = detectHikes(ra ? q.replace(ra.phrase, ' ') : q, now);
+  const swapped = HIKES.filter((h) => REPLACED[h.id]?.[1].some((a) => hasKw(q, a)))
+    .map((h) => `<p><b>${esc(REPLACED[h.id][0])} is off the plan:</b> ${esc(h.shortName)} replaces it on <b>${esc(h.dateShort)}</b>.</p>`);
+  return [...new Set(moved)]
+    .map((h) => `<p><b>${esc(h.shortName)} moved:</b> it's now on <b>${esc(h.dateLong)}</b>, not ${esc(h.movedFrom.dateShort)}.</p>`)
+    .concat(swapped)
+    .join('');
 }
 
 /**
@@ -453,7 +483,7 @@ function answerFromPlan(raw, now) {
   const q = norm(raw);
   if (!q) return { html: '', matched: false };
 
-  // "A ride from Scarborough" names where they leave from, not the Scarborough hike.
+  // "A ride from Milton" names where they leave from, not the Milton hikes.
   const ra = rideArea(q);
   const { hikes, badDate, none } = detectHikes(ra ? q.replace(ra.phrase, ' ') : q, now);
   const { strong, weak, offTopic, anyHardStrong } = detectTopics(q);
@@ -474,15 +504,19 @@ function answerFromPlan(raw, now) {
   if (badDate) {
     return {
       matched: true,
-      html: `<p>${esc(badDate)} isn't a hike day. The plan has five Saturdays: Oct 3, 10, 17, 24 and 31.</p>`,
+      html: `<p>${esc(badDate)} isn't a hike day. The hikes are on ${esc(hikeDays())}.</p>`,
     };
   }
 
   // Naming a backup park or fallback trailhead on its own means "tell me about the backup",
-  // and so does asking about its fees or booking ("do we need to book Dundas Peak?").
+  // and so does asking about its fees, booking, hours or address ("do we need to book Dundas Peak?").
   if (hikes.length && BACKUP_NAMES.some((n) => hasKw(q, n))) {
+    const about = strong.filter((id) => ['fees', 'time', 'where'].includes(id));
     if (!strong.length) strong.push('backup');
-    else if (strong.includes('fees') && !strong.includes('backup')) strong.splice(strong.indexOf('fees'), 1, 'backup');
+    else if (about.length && !strong.includes('backup')) {
+      strong.splice(strong.indexOf(about[0]), 1, 'backup');
+      for (const id of about.slice(1)) strong.splice(strong.indexOf(id), 1);
+    }
   }
 
   // Answers about a hike also show the organizer's latest update for it (plans change).

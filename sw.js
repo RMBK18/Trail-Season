@@ -7,7 +7,7 @@
 // they open the app with a connection.
 // ─────────────────────────────────────────────────────────────
 
-const VERSION = 'fall-hike-2026-10-v22';
+const VERSION = 'fall-hike-2026-10-v23';
 
 // The app shell is cached as './', never './index.html': Cloudflare Pages
 // redirects /index.html to /, and Chrome won't open a page from a redirected
@@ -40,8 +40,8 @@ const ASSETS = [
   './img/hikes/forks-of-the-credit.jpg',
   './img/hikes/dundas-valley.jpg',
   './img/hikes/rattlesnake-point.jpg',
-  './img/hikes/balls-falls.jpg',
-  './img/hikes/rouge.jpg',
+  './img/hikes/crawford-lake.jpg',
+  './img/hikes/mount-nemo.jpg',
   './fonts/dm-sans.woff2',
   './fonts/libre-baskerville.woff2',
   './fonts/libre-baskerville-italic.woff2',
