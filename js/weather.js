@@ -9,10 +9,10 @@ import { HIKES } from './data.js';
 // Lat/long for each park (from public sources; very close is fine)
 const COORDS = {
   'forks-of-the-credit': { lat: 43.9069, lng: -80.0603, name: 'Forks of the Credit' },
-  'dundas-valley': { lat: 43.2817, lng: -80.3940, name: 'Dundas Valley' },
-  'rattlesnake-point': { lat: 43.4731, lng: -79.7858, name: 'Rattlesnake Point' },
-  'balls-falls': { lat: 43.1978, lng: -79.4458, name: 'Balls Falls' },
-  rouge: { lat: 43.81, lng: -79.16, name: 'Rouge Park (Twyn Rivers)' },
+  'dundas-valley': { lat: 43.2475, lng: -80.0081, name: 'Dundas Valley' },
+  'rattlesnake-point': { lat: 43.4697, lng: -79.9095, name: 'Rattlesnake Point' },
+  'crawford-lake': { lat: 43.4683, lng: -79.9486, name: 'Crawford Lake' },
+  'mount-nemo': { lat: 43.4207, lng: -79.8566, name: 'Mount Nemo' },
 };
 
 const CACHE_HOURS = 6;

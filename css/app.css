@@ -472,8 +472,8 @@ a.fact, button.fact { width: 100%; color: inherit; font: inherit; text-align: le
 .alert b { display: block; font-size: 15.5px; line-height: 1.3; }
 .alert span { display: block; font-size: 14.5px; margin-top: 2px; }
 /* Dark green time banner, like the muse "Plan for 8:00–8:30 AM arrivals" note */
-.alert-time { background: var(--forest); color: var(--cream); border-color: var(--forest-mid); }
-.alert-time .ic { color: var(--amber); }
+.alert-time, .alert-change { background: var(--forest); color: var(--cream); border-color: var(--forest-mid); }
+.alert-time .ic, .alert-change .ic { color: var(--amber); }
 .alert.inline { margin: 12px 0 0; }
 
 .block {

@@ -65,9 +65,10 @@ const SELFTEST = '_selftest';
 const SELFTEST_KEEP_MS = 3600 * 1000;
 const SELFTEST_MAX = 20;
 
-// A hike replaced by another on the same date: its replies move to the new one,
-// and phones still on the old app version keep working until they update.
-const RENAMED = { 'short-hills': 'rouge' };
+// A hike replaced by another on the same date: its replies, seats, alerts and
+// updates move to the new one, and phones still on the old app version keep
+// working until they update. Map straight to the current id (no chains).
+const RENAMED = { 'short-hills': 'mount-nemo', rouge: 'mount-nemo', 'balls-falls': 'crawford-lake' };
 
 const hikeById = new Map(HIKES.map((h) => [h.id, h]));
 const selftestHike = { id: SELFTEST, dateShort: 'Test', shortName: 'Self-test' };
@@ -268,9 +269,17 @@ export class RsvpStore extends DurableObject {
     )`);
     for (const [from, to] of Object.entries(RENAMED)) {
       if (!hikeById.has(to)) continue;
-      // A phone that somehow replied to both keeps its newer reply.
+      // A phone that already replied to the new hike keeps that reply.
       this.sql.exec(`DELETE FROM rsvps WHERE hike_id = ? AND device IN (SELECT device FROM rsvps WHERE hike_id = ?)`, from, to);
       this.sql.exec('UPDATE rsvps SET hike_id = ? WHERE hike_id = ?', to, from);
+      // Seats, alert history and ride alerts follow their replies (and go with any reply dropped above).
+      this.sql.exec('DELETE FROM ride_requests WHERE hike_id = ? AND (driver_id NOT IN (SELECT id FROM rsvps) OR rider_id NOT IN (SELECT id FROM rsvps))', from);
+      this.sql.exec('UPDATE OR IGNORE ride_requests SET hike_id = ? WHERE hike_id = ?', to, from);
+      this.sql.exec('UPDATE OR IGNORE ride_pings SET hike_id = ? WHERE hike_id = ?', to, from);
+      this.sql.exec('DELETE FROM push_subs WHERE hike_id = ? AND rsvp_id NOT IN (SELECT id FROM rsvps)', from);
+      this.sql.exec('UPDATE push_subs SET hike_id = ? WHERE hike_id = ?', to, from);
+      this.sql.exec('UPDATE updates SET hike_id = ? WHERE hike_id = ?', to, from);
+      for (const t of ['ride_requests', 'ride_pings']) this.sql.exec(`DELETE FROM ${t} WHERE hike_id = ?`, from);
     }
   }
 

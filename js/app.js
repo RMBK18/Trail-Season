@@ -109,7 +109,7 @@ function inviteText(h) {
 
 function seasonText() {
   return [
-    '🍂 Fall Hike App: five Saturday hikes near Toronto',
+    '🍂 Fall Hike App: five weekend hikes near Toronto',
     '',
     ...HIKES.map((h) => `${h.dateShort}: ${h.park}, meet ${h.meet.time} (${h.level}${h.optionLevel ? ` / ${h.optionLevel} option` : ''})`),
     '',
@@ -160,7 +160,7 @@ function signHTML(now, allHikes = getHikes()) {
   if (!nx) {
     return `<div class="sign sign-end">
       <span class="sign-label">Fall plan complete</span>
-      <span class="sign-park">Five Saturdays, five parks. Thanks for hiking.</span>
+      <span class="sign-park">Five weekends, five parks. Thanks for hiking.</span>
     </div>`;
   }
   const st = statusOf(nx, now);
@@ -241,7 +241,7 @@ function renderHome() {
       ${organizerKey() ? `<a id="org-btn" class="glass-btn" href="#/organizer" title="Send an update" aria-label="Send an update">${I.megaphone}</a>` : ''}
       <p class="canopy-eyebrow">${esc(APP.name)}</p>
       <h1 class="large-title">${taglineHTML(APP.tagline || APP.name)}</h1>
-      <p class="canopy-sub">${esc(APP.intro || 'Five Saturdays near Toronto, Oct 3 to Oct 31')}</p>
+      <p class="canopy-sub">${esc(APP.intro || 'Five weekend hikes near Toronto, Oct 3 to Oct 31')}</p>
       <div class="updates-pin" data-updates-pin aria-live="polite" hidden></div>
       ${carpoolBannerHTML(nx)}
       <div class="my-rides" data-my-rides hidden></div>
@@ -252,7 +252,7 @@ function renderHome() {
     <section class="list-wrap" aria-labelledby="list-h">
       ${showGetApp ? `<button class="get-app" type="button" data-open-install>${I.download}<span><b>Add to your home screen</b><span>Opens full screen and works without signal</span></span>${I.chevR}</button>` : ''}
       <p class="section-eyebrow">${esc(dateSpan(allHikes))}</p>
-      <h2 id="list-h" class="section-h">${allHikes.length === 5 ? 'The five Saturdays' : 'Upcoming Hikes'}</h2>
+      <h2 id="list-h" class="section-h">${allHikes.length === 5 ? 'The five weekends' : 'Upcoming Hikes'}</h2>
       <ol class="trail${homeShown ? '' : ' rise'}">${allHikes.map((h) => cardHTML(h, now, nx)).join('')}</ol>
       <p class="list-foot">Tap a hike for trails, fees, directions and what to bring.</p>
       ${APP.photo ? `<p class="photo-credit">${photoCredit(APP.photo, 'Top photo')}. Park photos are credited on each hike page.</p>` : ''}
@@ -921,7 +921,7 @@ function ridesCardHTML(h, area = '') {
   const free = drivers.filter((d) => d.seatsLeft > 0);
   const fullCars = drivers.length - free.length;
   const card = (d) => driverCard(h, d, list, me, over);
-  const short = h.dateShort.replace('Sat ', '');
+  const short = h.dateShort.replace(/^[A-Z][a-z]{2} /, '');
   const chips = from ? '' : `<p>Where are you coming from? I'll show the nearest drivers first.</p>
     <div class="area-chips">${AREAS.filter((a) => a.lat != null).map((a) => `<button type="button" class="chip-q" data-area-pick="${esc(a.name)}" data-hike="${h.id}">${esc(a.name)}</button>`).join('')}</div>`;
   return `<div class="rides-card" data-rides-card="${h.id}" data-area="${esc(area)}">
@@ -1652,7 +1652,7 @@ function renderShare() {
     <div class="pad">
       <section class="block">
         <h2>Invite friends</h2>
-        <p class="muted">Copy a ready-to-send message for any Saturday and paste it into your group chat.</p>
+        <p class="muted">Copy a ready-to-send message for any hike and paste it into your group chat.</p>
         <ul class="invites">
           ${HIKES.map((h) => `
           <li class="invite">
@@ -1998,7 +1998,7 @@ document.addEventListener('click', async (e) => {
   }
   if (t.matches('[data-native-share]')) {
     try {
-      await navigator.share({ title: APP.name, text: 'Five Saturday hikes near Toronto, Oct 3 to Oct 31.', url: appUrl() });
+      await navigator.share({ title: APP.name, text: 'Five weekend hikes near Toronto, Oct 3 to Oct 31.', url: appUrl() });
     } catch { /* user cancelled */ }
     return;
   }
