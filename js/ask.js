@@ -6,7 +6,7 @@
 
 import { HIKES, BASICS, APP, GROUP } from './data.js';
 import { CONFIG } from './config.js';
-import { esc, mapsUrl, nextHike, torontoDateISO, endMs } from './lib.js';
+import { esc, mapsUrl, nextHike, torontoDateISO, endMs, overMs } from './lib.js';
 import { isRsvpLive, countsFor, allUpdates } from './rsvp.js';
 import { AREAS } from './carpool.js';
 
@@ -270,10 +270,18 @@ const levelText = (h) => `${badge(h.level)}${h.optionLevel ? ` with ${h.optionLe
 const meetLine = (h) => `${esc(h.meet.time)}${h.meet.place ? ` at ${esc(h.meet.place)}` : ''}`;
 const roadAlert = (h) => h.alerts.filter((a) => a.kind === 'road').map((a) => `<p class="ans-warn"><b>${esc(a.title)}.</b> ${esc(a.text)}</p>`).join('');
 
+// The time the current question is asked (set by answer()). Answers about "all the hikes"
+// list only the ones still to come; a done hike still answers when it's named.
+let askedAt = Date.now();
+const current = () => {
+  const up = HIKES.filter((h) => askedAt <= overMs(h));
+  return up.length ? up : HIKES;
+};
+
 const ANSWERS = {
   time: {
     one: (h) => `<p>Meet <b>${meetLine(h)}</b> on ${esc(h.dateShort)}.${h.meet.note ? ' ' + esc(h.meet.note) : ''}</p>`,
-    all: () => list(HIKES.map((h) => `${who(h)}: ${meetLine(h)}`)),
+    all: () => list(current().map((h) => `${who(h)}: ${meetLine(h)}`)),
   },
   where: {
     one: (h) =>
@@ -281,44 +289,44 @@ const ANSWERS = {
         ? `<p>Meet at <b>${esc(h.meet.place)}</b>, ${esc(h.park)}${h.meet.address ? ` (${esc(h.meet.address)})` : `, ${esc(h.area)}`}, at ${esc(h.meet.time)}.</p>`
         : `<p>Meet at ${esc(h.meet.time)}. The plan doesn't name a meeting spot inside ${esc(h.park)}.</p>` + dontKnow()) +
       roadAlert(h) + ext(mapsUrl(h.maps), 'Meeting spot in Google Maps'),
-    all: () => list(HIKES.map((h) => `${who(h)}: ${h.meet.place ? esc(h.meet.place) + (h.meet.address ? `, ${esc(h.meet.address)}` : '') : 'meeting spot not in the plan'}`)),
+    all: () => list(current().map((h) => `${who(h)}: ${h.meet.place ? esc(h.meet.place) + (h.meet.address ? `, ${esc(h.meet.address)}` : '') : 'meeting spot not in the plan'}`)),
   },
   fees: {
     one: (h) => `<p><b>${esc(h.fee.amount)}</b>. ${esc(h.fee.note)}</p>` + (h.booking ? ext(h.booking.url, h.booking.label) : ''),
-    all: () => list(HIKES.map((h) => `${who(h)}: <b>${esc(h.fee.amount)}</b>, ${esc(h.fee.short)}`)),
+    all: () => list(current().map((h) => `${who(h)}: <b>${esc(h.fee.amount)}</b>, ${esc(h.fee.short)}`)),
   },
   dogs: {
     one: (h) => (h.dogs ? `<p>${esc(h.dogs)}.</p>` : notInPlan('whether dogs are allowed', h)),
-    all: () => list(HIKES.map((h) => `${who(h)}: ${h.dogs ? esc(h.dogs) : 'not in the plan'}`)),
+    all: () => list(current().map((h) => `${who(h)}: ${h.dogs ? esc(h.dogs) : 'not in the plan'}`)),
   },
   difficulty: {
     one: (h) => `<p>${levelText(h)}</p>` + list(h.trails.map(trailLine)),
-    all: () => list(HIKES.map((h) => `${who(h)}: ${levelText(h)}`)),
+    all: () => list(current().map((h) => `${who(h)}: ${levelText(h)}`)),
   },
   trails: {
     one: (h) => list(h.trails.map(trailLine)),
-    all: () => list(HIKES.map((h) => `${who(h)}: ${h.trails.map((t) => esc(t.name) + (t.length ? ` (${esc(t.length)})` : '')).join(', ')}`)),
+    all: () => list(current().map((h) => `${who(h)}: ${h.trails.map((t) => esc(t.name) + (t.length ? ` (${esc(t.length)})` : '')).join(', ')}`)),
   },
   drive: {
     one: (h) => `<p>Drive: <b>${esc(h.drive.text)}</b>.</p>` + roadAlert(h) + ext(mapsUrl(h.maps), 'Directions in Google Maps'),
     all: () =>
-      list(HIKES.map((h) => `${who(h)}: ${esc(h.drive.text)}`)) +
-      HIKES.flatMap((h) => h.alerts.filter((a) => a.kind === 'road').map((a) => `<p class="ans-warn"><b>${esc(h.dateShort)}: ${esc(a.title)}.</b> ${esc(a.text)}</p>`)).join(''),
+      list(current().map((h) => `${who(h)}: ${esc(h.drive.text)}`)) +
+      current().flatMap((h) => h.alerts.filter((a) => a.kind === 'road').map((a) => `<p class="ans-warn"><b>${esc(h.dateShort)}: ${esc(a.title)}.</b> ${esc(a.text)}</p>`)).join(''),
   },
   washrooms: {
     one: (h) =>
       h.noWashrooms
         ? `<p><b>${esc(h.washrooms)}.</b> Stop before you arrive.</p>`
         : h.washrooms ? `<p>${esc(h.washrooms)}.</p>` : notInPlan('washrooms', h),
-    all: () => list(HIKES.map((h) => `${who(h)}: ${h.washrooms ? esc(h.washrooms) : 'not in the plan'}`)),
+    all: () => list(current().map((h) => `${who(h)}: ${h.washrooms ? esc(h.washrooms) : 'not in the plan'}`)),
   },
   bring: {
     one: (h) => `<p>For this hike:</p>` + list(h.bring.map(esc)) + `<p>Every hike: ${esc(BASICS.join(', ').toLowerCase().replace(/^./, (c) => c.toUpperCase()))}.</p>`,
-    all: () => `<p>Every hike: ${esc(BASICS.join(', ').toLowerCase().replace(/^./, (c) => c.toUpperCase()))}. Plus:</p>` + list(HIKES.map((h) => `${who(h)}: ${esc(h.bring[0])}`)),
+    all: () => `<p>Every hike: ${esc(BASICS.join(', ').toLowerCase().replace(/^./, (c) => c.toUpperCase()))}. Plus:</p>` + list(current().map((h) => `${who(h)}: ${esc(h.bring[0])}`)),
   },
   highlights: {
     one: (h) => `<p>${esc(h.fallLine)}</p>`,
-    all: () => list(HIKES.map((h) => `${who(h)}: ${esc(h.fallLine)}`)),
+    all: () => list(current().map((h) => `${who(h)}: ${esc(h.fallLine)}`)),
   },
   backup: {
     one: (h) =>
@@ -328,12 +336,12 @@ const ANSWERS = {
       (h.alerts.find((a) => a.kind === 'crowd') ? `<p>${esc(h.alerts.find((a) => a.kind === 'crowd').title)}. ${esc(h.alerts.find((a) => a.kind === 'crowd').text)}</p>` : '') +
       ext(mapsUrl(h.backup.maps), `Directions to ${h.backup.name}`) +
       (h.backup.then ? `<p>Second backup: <b>${esc(h.backup.then.name)}</b>.</p>` + ext(mapsUrl(h.backup.then.maps), `Directions to ${h.backup.then.name}`) : ''),
-    all: () => list(HIKES.map((h) => `${who(h)}: ${esc(h.backup.name)}${h.backup.then ? `, then ${esc(h.backup.then.name)}` : ''}`)),
+    all: () => list(current().map((h) => `${who(h)}: ${esc(h.backup.name)}${h.backup.then ? `, then ${esc(h.backup.then.name)}` : ''}`)),
   },
   picnic: {
     one: (h) => (h.picnic ? `<p>Yes, ${esc(h.park)} has ${esc(h.picnic.toLowerCase())}.</p>` : notInPlan('picnic tables', h)),
     all: () => {
-      const hikes = HIKES.filter((h) => h.picnic);
+      const hikes = current().filter((h) => h.picnic);
       return hikes.length
         ? `<p>The plan lists picnic spots at:</p>` + list(hikes.map((h) => `${who(h)}: ${esc(h.picnic)}`))
         : `<p>The plan doesn't list picnic tables at any of the hikes.</p>`;
@@ -345,7 +353,7 @@ const ANSWERS = {
       return a ? `<p><b>${esc(a.title)}.</b> ${esc(a.text)}</p>` : `<p>The plan doesn't mention ticks at ${esc(h.park)}.</p>`;
     },
     all: () => {
-      const hikes = HIKES.filter(tickAlert);
+      const hikes = current().filter(tickAlert);
       return hikes.length
         ? list(hikes.map((h) => `${who(h)}: ${esc(tickAlert(h).text)}`))
         : `<p>The plan doesn't mention ticks on any of the hikes.</p>`;
@@ -359,7 +367,7 @@ const ANSWERS = {
       return bf || notInPlan('a barrier-free trail', h);
     },
     all: () => {
-      const hikes = HIKES.filter((h) => h.stroller || barrierFree(h));
+      const hikes = current().filter((h) => h.stroller || barrierFree(h));
       return hikes.length
         ? `<p>Strollers and wheelchairs:</p>` + list(hikes.map((h) => `${who(h)}: ${esc(h.stroller ? h.stroller.text : `${barrierFree(h).name} is barrier-free.`)}`))
         : `<p>The plan doesn't list a barrier-free trail on any of the hikes.</p>` + dontKnow();
@@ -375,14 +383,14 @@ const ANSWERS = {
     },
     all: () =>
       `<p>${esc(GROUP.kids)} The easiest trail on each hike:</p>` +
-      list(HIKES.map((h) => { const t = easiestTrail(h); return `${who(h)}: ${esc(t.name)}${t.length ? ` (${esc(t.length)})` : ''}`; })),
+      list(current().map((h) => { const t = easiestTrail(h); return `${who(h)}: ${esc(t.name)}${t.length ? ` (${esc(t.length)})` : ''}`; })),
   },
   parking: {
     one: (h) =>
       `<p>Park at ${esc(h.park)}${h.meet.place ? `, by ${esc(h.meet.place)}${h.meet.address ? ` (${esc(h.meet.address)})` : ''} where we meet` : ''}. <b>${esc(h.fee.amount)}</b>. ${esc(h.fee.note)}</p>` +
       (h.meet.place ? '' : `<p>The plan doesn't say which parking lot we meet at.</p>` + dontKnow()) +
       (h.booking ? ext(h.booking.url, h.booking.label) : ''),
-    all: () => `<p>Every park has parking. What you pay to get in:</p>` + list(HIKES.map((h) => `${who(h)}: <b>${esc(h.fee.amount)}</b>, ${esc(h.fee.short)}`)),
+    all: () => `<p>Every park has parking. What you pay to get in:</p>` + list(current().map((h) => `${who(h)}: <b>${esc(h.fee.amount)}</b>, ${esc(h.fee.short)}`)),
   },
   food: {
     one: (h) =>
@@ -390,7 +398,7 @@ const ANSWERS = {
       (h.food ? `<p>For coffee or a meal before or after: ${esc(h.food)}.</p>` : ''),
     all: () =>
       `<p>The plan doesn't list food at the parks, so pack snacks. For coffee or a meal before or after:</p>` +
-      list(HIKES.filter((h) => h.food).map((h) => `${who(h)}: ${esc(h.food)}`)),
+      list(current().filter((h) => h.food).map((h) => `${who(h)}: ${esc(h.food)}`)),
   },
   cancel: {
     one: (h) => `<p>${esc(GROUP.rain)}</p><p>Check the weather card on the ${esc(h.dateShort)} hike page.</p>`,
@@ -450,7 +458,12 @@ function overview(h) {
 const hikeDays = () => HIKES.map((h) => h.dateShort).join(', ').replace(/, ([^,]*)$/, ' and $1');
 
 function schedule() {
-  return `<p>${HIKES.length === 5 ? 'Five weekends' : 'The hikes'}:</p>` + list(HIKES.map((h) => `${who(h)}: meet ${esc(h.meet.time)} ${badge(h.level)}`));
+  const line = (h) => `${who(h)}: meet ${esc(h.meet.time)} ${badge(h.level)}`;
+  const up = HIKES.filter((h) => askedAt <= overMs(h));
+  const done = HIKES.filter((h) => askedAt > overMs(h));
+  if (!done.length) return `<p>${HIKES.length === 5 ? 'Five weekends' : 'The hikes'}:</p>` + list(HIKES.map(line));
+  return (up.length ? `<p>Coming up:</p>` + list(up.map(line)) : `<p>The fall plan is finished.</p>`) +
+    `<p>Done:</p>` + list(done.map((h) => who(h)));
 }
 
 /**
@@ -460,6 +473,7 @@ function schedule() {
  * @returns {{ html: string, matched: boolean, unsure: boolean }}
  */
 export function answer(raw, now = new Date()) {
+  askedAt = now.getTime();
   const res = answerFromPlan(raw, now);
   const html = (res.matched ? movedNote(raw, now) : '') + res.html;
   return { ...res, html, unsure: res.html.includes(esc(DONT_KNOW)) };
