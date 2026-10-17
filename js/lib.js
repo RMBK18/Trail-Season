@@ -8,6 +8,9 @@ export const mapsUrl = (destination) =>
 
 export const meetMs = (h) => Date.parse(`${h.dateISO}T${h.meetTime24}:00${APP.tzOffset}`);
 export const endMs = (h) => Date.parse(`${h.dateISO}T23:59:59${APP.tzOffset}`);
+// The group has gone home 6 hours after the meet: the hike moves to "Past hikes" and the
+// next one comes first. (Replies and rides stay open until endMs, the end of the day.)
+export const overMs = (h) => meetMs(h) + 6 * 3600 * 1000;
 
 // 'upcoming' | 'live' (hike day, after meet time) | 'done'
 export function statusOf(h, now = new Date()) {
@@ -17,8 +20,8 @@ export function statusOf(h, now = new Date()) {
   return 'done';
 }
 
-// First hike whose day hasn't ended yet (Toronto time).
-export const nextHike = (now = new Date()) => HIKES.find((h) => now.getTime() <= endMs(h)) || null;
+// First hike that isn't over yet (see overMs).
+export const nextHike = (now = new Date()) => HIKES.find((h) => now.getTime() <= overMs(h)) || null;
 
 const dateFmt = new Intl.DateTimeFormat('en-CA', {
   timeZone: APP.timeZone, year: 'numeric', month: '2-digit', day: '2-digit',

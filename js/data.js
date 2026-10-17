@@ -247,7 +247,7 @@ export const HIKES = [
     n: 4,
     dateISO: '2026-10-24',
     day: 24,
-    meetTime24: '08:30',
+    meetTime24: '09:00',
     dateShort: 'Sat Oct 24',
     dateLong: 'Saturday, October 24',
     park: 'Mono Cliffs Provincial Park',
@@ -255,7 +255,7 @@ export const HIKES = [
     area: 'Mono',
     level: 'EASY',
     optionLevel: 'MODERATE',
-    meet: { time: '8:30 AM', place: 'the parking lot inside the gate', address: '795086 Third Line EHS, Mono', note: 'Permits start at 8:00 AM. Scan your permit barcode at the gate to get in.' },
+    meet: { time: '9:00 AM', place: 'the parking lot inside the gate', address: '795086 Third Line EHS, Mono', note: 'Permits start at 8:00 AM. Scan your permit barcode at the gate to get in.' },
     trails: [
       { name: 'Carriage, Spillway and Cliff-Top Side trails', level: 'EASY', length: '~5 km loop', time: '~2 hr', note: 'Metal stairs down into the crevice between the cliffs, then the lookout platform' },
       { name: 'Lookout Trail', level: 'MODERATE', length: '600 m', time: null, note: 'Steep, rough climb off the Walter Tovell Trail to the best view in the park' },
@@ -265,7 +265,7 @@ export const HIKES = [
     drive: { text: '~70–80 min from North York', short: '~70–80 min' },
     fee: {
       amount: '$18/vehicle',
-      note: 'Every car needs an advance daily vehicle permit: no drive-up entry and no roadside parking. Book at reservations.ontarioparks.com from 7:00 AM on Mon Oct 19 (five days ahead). Full day $18 per car, or the 8 AM–12 PM slot $8.50 (your visit has to fit the slot).',
+      note: 'Every car needs an advance daily vehicle permit: no drive-up entry and no roadside parking. Book at reservations.ontarioparks.com from 7:00 AM on Mon Oct 19 (five days ahead). Get the full-day permit ($18 per car): we start at 9:00, so the 8 AM–12 PM slot ($8.50) only works if your car is out by noon.',
       short: 'advance permit required for every car',
     },
     booking: {
@@ -284,8 +284,8 @@ export const HIKES = [
     kidsNote: 'Hold little hands on the crevice stairs and at the lookout, and stay on the trail: there are deep cracks in the rock.',
     stroller: { ok: false, text: 'Not stroller-friendly: stairs, roots and rocks. Bring a baby carrier instead.' },
     alerts: [
-      { kind: 'change', title: 'New park: replaces Crawford Lake', text: 'Same date, Sat Oct 24. Meet 8:30 AM in the parking lot inside the gate.' },
-      { kind: 'permit', title: 'Book your permit Mon Oct 19 at 7:00 AM', text: 'No permit, no entry, and the park sold out last weekend. One permit per car at reservations.ontarioparks.com: full day $18, or 8 AM–12 PM $8.50. Cell signal is patchy, so screenshot the barcode before you leave home.' },
+      { kind: 'change', title: 'New park: replaces Crawford Lake', text: 'Same date, Sat Oct 24. Meet 9:00 AM in the parking lot inside the gate.' },
+      { kind: 'permit', title: 'Book your permit Mon Oct 19 at 7:00 AM', text: 'No permit, no entry, and the park sold out last weekend. One permit per car at reservations.ontarioparks.com: get the full day ($18), since we start at 9:00. Cell signal is patchy, so screenshot the barcode before you leave home.' },
     ],
     bring: ['Advance daily vehicle permit for your car ($18), with the barcode saved on your phone', 'Leash, if your dog is coming'],
     maps: 'Mono Cliffs Provincial Park, 795086 Third Line EHS, Mono, ON',
@@ -310,7 +310,7 @@ export const HIKES = [
     n: 5,
     dateISO: '2026-10-31',
     day: 31,
-    meetTime24: '08:30',
+    meetTime24: '09:00',
     dateShort: 'Sat Oct 31',
     dateLong: 'Saturday, October 31',
     park: 'Bronte Creek Provincial Park',
@@ -318,7 +318,7 @@ export const HIKES = [
     area: 'Oakville',
     level: 'EASY',
     optionLevel: 'MODERATE',
-    meet: { time: '8:30 AM', place: 'Parking Lot F (Spruce Lane Farm)', address: '1219 Burloak Dr, Oakville', note: 'Use the day-use entrance on Burloak Drive, then follow the signs to Lot F. The day-use area opens at 8:00 AM.' },
+    meet: { time: '9:00 AM', place: 'Parking Lot F (Spruce Lane Farm)', address: '1219 Burloak Dr, Oakville', note: 'Use the day-use entrance on Burloak Drive, then follow the signs to Lot F. The day-use area opens at 8:00 AM.' },
     trails: [
       { name: 'Trillium Trail', level: 'EASY', length: '1 km', time: null, note: 'Stroller- and wheelchair-friendly, with a view down into the valley' },
       { name: 'Ravine Trail', level: 'EASY', length: '2.7 km one way', time: null, note: 'Along the top of the 50 m deep ravine, from Lot F to the picnic area by Lot A' },
@@ -349,7 +349,7 @@ export const HIKES = [
     kidsNote: "Kids 10 and under love the Children's Farm animals and the big red Playbarn (indoor play, listed as open year-round) by Lot C. The Nature Centre and Spruce Lane Farmhouse are closed this time of year.",
     stroller: { ok: true, text: "Yes: the Trillium Trail (1 km, from Lot F) and the paved Maiden's Blush Trail (1 km, from Lot C). Skip Half Moon Valley with a stroller: it's steep." },
     alerts: [
-      { kind: 'change', title: 'New park: replaces Mount Nemo', text: 'Same date, Sat Oct 31. Meet 8:30 AM at Parking Lot F (Spruce Lane Farm).' },
+      { kind: 'change', title: 'New park: replaces Mount Nemo', text: 'Same date, Sat Oct 31. Meet 9:00 AM at Parking Lot F (Spruce Lane Farm).' },
       { kind: 'tick', title: 'Ticks and poison ivy', text: 'Both are common here, especially along trail edges and parking lots. Stay on the trail and check for ticks afterwards.' },
     ],
     bring: ['Daily vehicle permit ($21 per car), booked online', 'Leash, if your dog is coming'],

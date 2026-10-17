@@ -1,5 +1,5 @@
 import { HIKES, BASICS, APP, KIDS_LABELS, hikeById } from './data.js';
-import { esc, mapsUrl, meetMs, endMs, statusOf, nextHike, isHikeDay, countdownParts } from './lib.js';
+import { esc, mapsUrl, meetMs, endMs, overMs, statusOf, nextHike, isHikeDay, countdownParts } from './lib.js';
 import { answer, askLiveAI, isLiveAIOn, rideTarget, updateNoteFor, DONT_KNOW, FORWARDED, OFF_TOPIC_REPLY, SUGGESTIONS } from './ask.js';
 import {
   isRsvpLive, setRsvp, removeRsvp, subscribeRsvps, refreshAll, countsFor, myReply, listFor,
@@ -130,8 +130,10 @@ function homeStateKey(now) {
   return nx ? `${nx.id}:${statusOf(nx, now)}` : 'done';
 }
 
+const isPast = (h, now) => now.getTime() > overMs(h);
+
 function cardHTML(h, now, nx) {
-  const st = statusOf(h, now);
+  const st = isPast(h, now) ? 'done' : statusOf(h, now);
   const isNext = nx && nx.id === h.id;
   const chip =
     st === 'done' ? '<span class="chip chip-done">Done</span>'
@@ -158,7 +160,7 @@ function cardHTML(h, now, nx) {
 }
 
 function signHTML(now, allHikes = getHikes()) {
-  const nx = allHikes.find((h) => now.getTime() <= endMs(h)) || null;
+  const nx = allHikes.find((h) => !isPast(h, now)) || null;
   if (!nx) {
     return `<div class="sign sign-end">
       <span class="sign-label">Fall plan complete</span>
@@ -234,7 +236,10 @@ function dateSpan(hikes) {
 function renderHome() {
   const now = new Date();
   const allHikes = getHikes();
-  const nx = allHikes.find((h) => now.getTime() <= endMs(h)) || null;
+  // Upcoming hikes first; done ones go to "Past hikes" at the end, most recent first.
+  const upcoming = allHikes.filter((h) => !isPast(h, now));
+  const past = allHikes.filter((h) => isPast(h, now)).reverse();
+  const nx = upcoming[0] || null;
   homeKey = homeStateKey(now);
   const showGetApp = !isStandalone() && (isIOS || isAndroid);
   $('#view-hikes').innerHTML = `
@@ -253,10 +258,14 @@ function renderHome() {
     </header>
     <section class="list-wrap" aria-labelledby="list-h">
       ${showGetApp ? `<button class="get-app" type="button" data-open-install>${I.download}<span><b>Add to your home screen</b><span>Opens full screen and works without signal</span></span>${I.chevR}</button>` : ''}
-      <p class="section-eyebrow">${esc(dateSpan(allHikes))}</p>
-      <h2 id="list-h" class="section-h">${allHikes.length === 5 ? 'The five weekends' : 'Upcoming Hikes'}</h2>
-      <ol class="trail${homeShown ? '' : ' rise'}">${allHikes.map((h) => cardHTML(h, now, nx)).join('')}</ol>
-      <p class="list-foot">Tap a hike for trails, fees, directions and what to bring.</p>
+      <p class="section-eyebrow">${esc(dateSpan(upcoming.length ? upcoming : allHikes))}</p>
+      <h2 id="list-h" class="section-h">${!past.length && allHikes.length === 5 ? 'The five weekends' : upcoming.length ? 'Coming up' : 'All done for this fall'}</h2>
+      ${upcoming.length ? `<ol class="trail${homeShown ? '' : ' rise'}">${upcoming.map((h) => cardHTML(h, now, nx)).join('')}</ol>
+      <p class="list-foot">Tap a hike for trails, fees, directions and what to bring.</p>` : ''}
+      ${past.length ? `<details class="past-hikes"${upcoming.length ? '' : ' open'}>
+        <summary><span>Past hikes</span> <span class="past-count">${past.length}</span>${I.chevR}</summary>
+        <ol class="trail trail-past">${past.map((h) => cardHTML(h, now, nx)).join('')}</ol>
+      </details>` : ''}
       ${APP.photo ? `<p class="photo-credit">${photoCredit(APP.photo, 'Top photo')}. Park photos are credited on each hike page.</p>` : ''}
     </section>`;
   fillGoing();
@@ -1654,6 +1663,9 @@ const stepsHTML = (steps) => `<ol class="steps">${steps.map((s) => `<li>${s}</li
 
 function renderShare() {
   const photo = HIKES[0]?.photo;
+  // Invites only for hikes still to come (all of them once the season is over)
+  const upcoming = HIKES.filter((h) => !isPast(h, new Date()));
+  const invites = upcoming.length ? upcoming : HIKES;
   $('#view-share').innerHTML = `
     ${barHTML('Share', photo)}
     <div class="pad">
@@ -1661,7 +1673,7 @@ function renderShare() {
         <h2>Invite friends</h2>
         <p class="muted">Copy a ready-to-send message for any hike and paste it into your group chat.</p>
         <ul class="invites">
-          ${HIKES.map((h) => `
+          ${invites.map((h) => `
           <li class="invite">
             <div class="invite-head">
               <span class="blaze blaze-sm blaze-${h.level.toLowerCase()}" aria-hidden="true"></span>

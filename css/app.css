@@ -306,6 +306,19 @@ body.kb .tabbar { display: none; }
 .blaze-easy { background: var(--easy); }
 .blaze-moderate { background: var(--amber); }
 .stop-done .blaze { background: var(--line-strong); }
+/* Done hikes, folded away at the end of the list */
+.past-hikes { margin: 22px 0 6px; }
+.past-hikes > summary {
+  display: flex; align-items: center; gap: 10px; list-style: none; cursor: pointer;
+  padding: 13px 16px; border-radius: 16px; background: var(--surface); border: 1px solid var(--line);
+  font-weight: 700; color: var(--ink-2); -webkit-tap-highlight-color: transparent;
+}
+.past-hikes > summary::-webkit-details-marker { display: none; }
+.past-hikes .past-count { margin-right: auto; min-width: 26px; padding: 1px 8px; border-radius: 999px; background: var(--surface-2); font-size: 13px; text-align: center; }
+.past-hikes > summary .ic { width: 18px; height: 18px; transition: transform 0.2s; }
+.past-hikes[open] > summary { margin-bottom: 14px; }
+.past-hikes[open] > summary .ic { transform: rotate(90deg); }
+.trail-past .card { opacity: 0.85; }
 
 .card {
   position: relative; display: block;
