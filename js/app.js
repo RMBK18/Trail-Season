@@ -30,6 +30,8 @@ const badge = (level, opt = false) =>
 const levelBadges = (h) => badge(h.level) + (h.optionLevel ? badge(h.optionLevel, true) : '');
 const kidsTag = (h) =>
   KIDS_LABELS[h.kids] ? `<span class="kids-tag kids-${esc(h.kids)}">${I.users}${esc(KIDS_LABELS[h.kids])}</span>` : '';
+// Only for hikes whose plan says the trails suit a stroller
+const strollerTag = (h) => (h.stroller?.ok ? `<span class="kids-tag kids-yes">${I.stroller}Stroller-friendly</span>` : '');
 const easiestTrail = (h) => h.trails.find((t) => t.level === 'EASY') || h.trails[0];
 // Credit line the photo licences require (author, licence, source; photos are cropped).
 const photoCredit = (p, what = 'Photo') =>
@@ -144,7 +146,7 @@ function cardHTML(h, now, nx) {
         : `<span class="card-top"><span class="card-date">${esc(h.dateShort)}</span>${chip}</span>`}
       <h3 class="card-park">${esc(h.park)}</h3>
       <span class="card-area">${esc(h.area)}</span>
-      <span class="card-badges">${levelBadges(h)}${kidsTag(h)}</span>
+      <span class="card-badges">${levelBadges(h)}${kidsTag(h)}${strollerTag(h)}</span>
       <span class="card-facts">
         <span class="fact-inline">${I.clock}Meet ${esc(h.meet.time)}</span>
         <span class="fact-inline">${I.car}${esc(h.drive.short)}</span>
@@ -1373,6 +1375,10 @@ function kidsRow(h) {
   return `<li class="amen">${I.users}<div><b>Kids</b><span>${esc(KIDS_LABELS[h.kids] + '.' + tip + (h.kidsNote ? ' ' + h.kidsNote : ''))}</span></div></li>`;
 }
 
+const strollerRow = (h) => (h.stroller
+  ? `<li class="amen${h.stroller.ok ? '' : ' amen-warn'}">${I.stroller}<div><b>Strollers</b><span>${esc(h.stroller.text)}</span></div></li>`
+  : '');
+
 // The Drive and Fee tiles at the top of a hike are buttons: Drive opens directions,
 // Fee opens booking (or, with nothing to book, jumps to the fee details).
 const factCta = (text, icon) => `<span class="fact-cta">${esc(text)}${icon}</span>`;
@@ -1410,7 +1416,7 @@ function renderDetail(h) {
       <p class="hero-date">${esc(h.dateLong)}</p>
       <h1 class="hero-title">${esc(h.park)}</h1>
       <p class="hero-area">${esc(h.area)}</p>
-      <div class="hero-badges">${levelBadges(h)}${kidsTag(h)}</div>
+      <div class="hero-badges">${levelBadges(h)}${kidsTag(h)}${strollerTag(h)}</div>
     </header>
 
     <div class="detail-body">
@@ -1475,6 +1481,7 @@ function renderDetail(h) {
         <ul class="amenities">
           ${washroomRow}
           ${kidsRow(h)}
+          ${strollerRow(h)}
           <li class="amen">${I.paw}<div><b>Dogs</b><span>${h.dogs ? esc(h.dogs) : 'Not listed in the plan'}</span></div></li>
           ${h.picnic ? `<li class="amen">${I.table}<div><b>Picnic</b><span>${esc(h.picnic)}</span></div></li>` : ''}
         </ul>

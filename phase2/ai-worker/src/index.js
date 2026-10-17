@@ -49,6 +49,7 @@ function hikeFacts(h) {
     h.picnic && `- Picnic: ${h.picnic}`,
     KIDS_LABELS[h.kids] && `- Kids: ${KIDS_LABELS[h.kids]}`,
     h.kidsNote && `- With kids: ${h.kidsNote}`,
+    h.stroller && `- Strollers: ${h.stroller.text}`,
     h.food && `- Food nearby: ${h.food}`,
     ...h.alerts.map((a) => `- Alert: ${a.title}. ${a.text}`),
     `- Bring: ${h.bring.join('; ')}`,

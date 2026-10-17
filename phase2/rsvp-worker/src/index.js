@@ -68,7 +68,10 @@ const SELFTEST_MAX = 20;
 // A hike replaced by another on the same date: its replies, seats, alerts and
 // updates move to the new one, and phones still on the old app version keep
 // working until they update. Map straight to the current id (no chains).
-const RENAMED = { 'short-hills': 'mount-nemo', rouge: 'mount-nemo', 'balls-falls': 'crawford-lake' };
+const RENAMED = {
+  'short-hills': 'bronte-creek', rouge: 'bronte-creek', 'mount-nemo': 'bronte-creek',
+  'balls-falls': 'mono-cliffs', 'crawford-lake': 'mono-cliffs',
+};
 
 const hikeById = new Map(HIKES.map((h) => [h.id, h]));
 const selftestHike = { id: SELFTEST, dateShort: 'Test', shortName: 'Self-test' };
