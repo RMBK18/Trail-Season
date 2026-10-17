@@ -22,6 +22,7 @@ export const I = {
   send: svg('<path d="M12 19.5v-15"/><path d="m6 10.5 6-6 6 6"/>', 'stroke-width="2.4"'),
   ext: svg('<path d="M14 4.5h5.5V10"/><path d="M19.5 4.5 11 13"/><path d="M17.5 14v4a1.5 1.5 0 0 1-1.5 1.5H6A1.5 1.5 0 0 1 4.5 18V8A1.5 1.5 0 0 1 6 6.5h4"/>'),
   route: svg('<circle cx="6" cy="18" r="2.2"/><circle cx="18" cy="6" r="2.2"/><path d="M8.2 18H15a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h6.8"/>'),
+  stroller: svg('<path d="M3.5 5.5h2l1.3 4"/><path d="M6.8 9.5h13.4a6 6 0 0 1-6 6h-1.6a6 6 0 0 1-5.8-6Z"/><path d="M13.5 9.5V3.6a6 6 0 0 1 6.5 5.9"/><circle cx="9" cy="19.2" r="1.6"/><circle cx="16.5" cy="19.2" r="1.6"/>'),
   users: svg('<circle cx="9" cy="8.5" r="3.2"/><path d="M3.5 19.5c0-3 2.5-5 5.5-5s5.5 2 5.5 5"/><path d="M15.5 5.6a3.2 3.2 0 0 1 0 5.8"/><path d="M17.5 14.8c1.8.6 3 2.3 3 4.7"/>'),
   swap: svg('<path d="M4 8h13.5"/><path d="m14 4.5 3.5 3.5-3.5 3.5"/><path d="M20 16H6.5"/><path d="m10 12.5-3.5 3.5 3.5 3.5"/>'),
   boot: svg('<path d="M7 3.5h5v7l5.5 2.3a3 3 0 0 1 1.9 2.8v1.9H4.5V13L7 10.5Z"/><path d="M4.5 20h15"/><path d="M12 7h-2.5M12 10h-2.5"/>'),

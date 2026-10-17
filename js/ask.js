@@ -15,16 +15,16 @@ export const FORWARDED = `I don't know that one yet, so I've passed it on to ${A
 export const OFF_TOPIC_REPLY = `I can only help with the fall hikes.`;
 
 export const SUGGESTIONS = [
-  'What time do we meet on Oct 3?',
-  'How much is Crawford Lake?',
+  'What time do we meet on Oct 24?',
+  'Do I need a permit for Mono Cliffs?',
   'Can I bring my dog?',
   'I need a ride',
-  'Parking at Mount Nemo?',
+  'Is Bronte Creek stroller-friendly?',
   'How does carpooling work?',
-  'How hard is Rattlesnake Point?',
+  'How hard is Mono Cliffs?',
   'What should I bring?',
-  'How long is the drive to Dundas?',
-  "What's the backup for Oct 17?",
+  'How long is the drive to Bronte Creek?',
+  "What's the backup for Oct 31?",
 ];
 
 // ── Normalising and keyword helpers ─────────────────────────
@@ -47,28 +47,36 @@ function hasKw(q, kw) {
 
 // ── Which hike is the question about? ───────────────────────
 const ALIASES = {
-  'forks-of-the-credit': ['forks of the credit', 'forks', 'credit', 'caledon', 'kettle lake', 'kettle trail', 'kettle', 'meadow trail', 'cataract falls', 'mono cliffs'],
+  'forks-of-the-credit': ['forks of the credit', 'forks', 'credit', 'caledon', 'kettle lake', 'kettle trail', 'kettle', 'meadow trail', 'cataract falls'],
   'dundas-valley': ['dundas valley', 'dundas peak', 'tew falls', "tew's falls", 'tews falls', 'spencer gorge', 'dundas', 'hermitage ruins', 'hermitage', 'main loop', 'heritage trail', 'trail centre', 'trail center', 'thanksgiving', 'headwaters', 'monarch', 'hilton falls'],
   'rattlesnake-point': ['rattlesnake point', 'rattlesnake', 'buffalo crag', 'nassagaweya', 'vista adventure', 'appleby line', 'appleby', 'milton', 'kelso'],
-  'crawford-lake': ['crawford lake', 'crawford', 'longhouse village', 'longhouse', 'longhouses', 'iroquoian village', 'boardwalk', 'escarpment trail', 'campbellville', 'conservation rd', 'conservation road', 'milton', 'hilton falls'],
-  'mount-nemo': ['mount nemo', 'mt nemo', 'mt. nemo', 'nemo', 'brock harris', 'south loop', 'north loop', 'guelph line', 'burlington', 'halloween', 'kelso'],
+  'mono-cliffs': ['mono cliffs', 'mono', 'mccarston', "mccarston's lake", 'mccarstons lake', 'spillway trail', 'spillway', 'cliff-top', 'cliff top', 'crevice', 'crevices', 'crevasse', 'carriage trail', 'walter tovell', 'lookout trail', 'third line', '3rd line', 'orangeville', 'hockley', 'hockley valley'],
+  'bronte-creek': ['bronte creek', 'bronte', 'spruce lane', 'playbarn', 'play barn', "children's farm", 'childrens farm', 'farm animals', 'trillium trail', 'ravine trail', "maiden's blush", 'maidens blush', 'half moon valley', 'halfmoon valley', 'burloak', 'oakville', 'lions valley', 'halloween'],
 };
 // Parks dropped from the plan: asking about them answers for the park that replaced them.
 const REPLACED = {
-  'crawford-lake': ['Balls Falls', ['balls falls', "ball's falls", 'ball falls']],
-  'mount-nemo': ['Rouge Park', ['rouge national urban park', 'rouge park', 'rouge valley', 'rouge']],
+  'mono-cliffs': [
+    ['Crawford Lake', ['crawford lake', 'crawford', 'longhouse village', 'longhouse']],
+    ['Balls Falls', ['balls falls', "ball's falls", 'ball falls']],
+  ],
+  'bronte-creek': [
+    ['Mount Nemo', ['mount nemo', 'mt nemo', 'mt. nemo', 'nemo', 'brock harris']],
+    ['Rouge Park', ['rouge national urban park', 'rouge park', 'rouge valley', 'rouge']],
+  ],
 };
+const replacedNames = (id) => (REPLACED[id] || []).flatMap(([, names]) => names);
 
 // Phrases removed before topic detection so "Hilton Falls" doesn't trigger "falls" (highlights), etc.
 const NAME_PHRASES = [
   'balls falls', "ball's falls", 'ball falls', 'cataract falls', 'hilton falls', 'dundas peak', "tew's falls", 'tews falls', 'tew falls', 'spencer gorge',
   'kettle trail', 'meadow trail', 'heritage trail', 'main loop trail', 'main loop', 'buffalo crag trail',
   'vista adventure trail', 'trail centre', 'trail center', 'forks of the credit',
-  'crawford lake trail', 'crawford lake', 'escarpment trail', 'south loop trail', 'south loop', 'north loop trail', 'north loop',
-  'brock harris lookout', 'brock harris', 'mount nemo', 'mt. nemo', 'mt nemo', 'nassagaweya canyon',
+  'crawford lake', 'mount nemo', 'mt. nemo', 'mt nemo', 'nassagaweya canyon',
+  'mono cliffs', 'carriage trail', 'spillway trail', 'cliff-top side trail', 'cliff-top', 'cliff top', 'walter tovell trail', 'lookout trail', "mccarston's lake", 'mccarstons lake',
+  'bronte creek', 'trillium trail', 'ravine trail', "maiden's blush trail", 'maidens blush trail', 'half moon valley trail', 'halfmoon valley trail', 'spruce lane farm', 'lions valley park', 'hockley valley',
 ];
 
-const BACKUP_NAMES = ['mono cliffs', 'hilton falls', 'kelso', 'headwaters', 'monarch', 'dundas peak', 'tew falls', "tew's falls", 'tews falls', 'spencer gorge'];
+const BACKUP_NAMES = ['hilton falls', 'kelso', 'hockley valley', 'hockley', 'lions valley', 'headwaters', 'monarch', 'dundas peak', 'tew falls', "tew's falls", 'tews falls', 'spencer gorge'];
 
 // Carpool: asking for a ride (show the live drivers) vs how it works
 const RIDE_WANTED = ['need a ride', 'need ride', 'get a ride', 'give me a ride', 'a lift', 'lift to', 'pick me up', 'drive me', 'any drivers', 'anyone driving', 'who is driving', "who's driving", 'whos driving', 'who can drive', 'can someone drive', 'can anyone drive', 'looking for a ride', 'no car', "don't have a car", 'dont have a car', 'without a car', "i don't drive", 'i dont drive', "i can't drive", 'i cant drive', 'spare seat', 'spare seats', 'empty seat', 'empty seats', 'free seat', 'free seats', 'seats left', 'rides'];
@@ -90,9 +98,9 @@ function detectHikes(q, now) {
   let badDate = null;
   let none = null;
 
-  // "Hilton Falls, Milton" is a backup park, not "the Milton hike" (Rattlesnake Point or Crawford Lake).
-  const qa = q.replace(/(hilton falls|kelso|crawford lake|rattlesnake point|rattlesnake),?\s*milton/g, '$1');
-  for (const h of HIKES) for (const a of [...ALIASES[h.id], ...(REPLACED[h.id]?.[1] || [])]) if (hasKw(qa, a)) ids.add(h.id);
+  // "Hilton Falls, Milton" is a backup park, not "the Milton hike" (Rattlesnake Point).
+  const qa = q.replace(/(hilton falls|kelso|crawford lake),?\s*milton/g, '$1');
+  for (const h of HIKES) for (const a of [...ALIASES[h.id], ...replacedNames(h.id)]) if (hasKw(qa, a)) ids.add(h.id);
 
   let rest = q;
   // "first hike", "3rd weekend", "last one"
@@ -148,7 +156,7 @@ const TOPICS = [
   { id: 'rsvp', kws: ['rsvp', 'who is coming', "who's coming", 'whos coming', 'who is going', "who's going", 'whos going', 'attending', 'sign up', 'signup', 'count me in', 'headcount', 'my reply', 'my rsvp', 'change my reply', 'update my reply', 'remove my reply', "i'm in", 'im in', 'how many people', 'how many of us', 'who else'] },
   { id: 'ticks', kws: ['tick', 'ticks', 'lyme'] },
   { id: 'kids', kws: ['kid', 'kids', 'child', 'children', 'toddler', 'toddlers', 'baby', 'babies', 'little one', 'little ones', 'son', 'daughter', 'family', 'families', 'family-friendly', 'family friendly'] },
-  { id: 'access', kws: ['wheelchair', 'stroller', 'strollers', 'accessible', 'accessibility', 'barrier-free', 'barrier free', 'mobility'] },
+  { id: 'access', kws: ['wheelchair', 'stroller', 'strollers', 'stroller-friendly', 'pram', 'prams', 'buggy', 'pushchair', 'accessible', 'accessibility', 'barrier-free', 'barrier free', 'mobility'] },
   { id: 'washrooms', kws: ['washroom', 'washrooms', 'bathroom', 'bathrooms', 'toilet', 'toilets', 'restroom', 'restrooms', 'loo', 'outhouse', 'outhouses', 'pee', 'privy', 'facilities'] },
   { id: 'dogs', kws: ['dog', 'dogs', 'puppy', 'puppies', 'pup', 'pups', 'pet', 'pets', 'leash', 'leashed', 'doggo'] },
   { id: 'parking', kws: ['parking', 'parking lot', 'parking lots', 'park the car', 'park my car', 'where to park', 'where do we park', 'where do i park', 'where should we park', 'where should i park'] },
@@ -346,12 +354,14 @@ const ANSWERS = {
   access: {
     one: (h) => {
       const t = barrierFree(h);
-      return t ? `<p>The <b>${esc(t.name)}</b> is barrier-free${t.length ? `: ${esc(t.length)}` : ''}.</p>` : notInPlan('a barrier-free trail', h);
+      const bf = t ? `<p>The <b>${esc(t.name)}</b> is barrier-free${t.length ? `: ${esc(t.length)}` : ''}.</p>` : '';
+      if (h.stroller) return `<p><b>Strollers:</b> ${esc(h.stroller.text)}</p>` + bf;
+      return bf || notInPlan('a barrier-free trail', h);
     },
     all: () => {
-      const hikes = HIKES.filter(barrierFree);
+      const hikes = HIKES.filter((h) => h.stroller || barrierFree(h));
       return hikes.length
-        ? list(hikes.map((h) => `${who(h)}: ${esc(barrierFree(h).name)}`))
+        ? `<p>Strollers and wheelchairs:</p>` + list(hikes.map((h) => `${who(h)}: ${esc(h.stroller ? h.stroller.text : `${barrierFree(h).name} is barrier-free.`)}`))
         : `<p>The plan doesn't list a barrier-free trail on any of the hikes.</p>` + dontKnow();
     },
   },
@@ -360,6 +370,7 @@ const ANSWERS = {
     one: (h) => {
       const t = easiestTrail(h);
       return `<p>${levelText(h)}. With kids, try the <b>${esc(t.name)}</b>${t.length ? ` (${esc(t.length)})` : ''}.${h.kidsNote ? ' ' + esc(h.kidsNote) : ''}</p>` +
+        (h.stroller ? `<p><b>Strollers:</b> ${esc(h.stroller.text)}</p>` : '') +
         `<p>${esc(GROUP.kids)}</p>`;
     },
     all: () =>
@@ -459,8 +470,9 @@ function movedNote(raw, now) {
   const q = norm(raw);
   const ra = rideArea(q);
   const { moved } = detectHikes(ra ? q.replace(ra.phrase, ' ') : q, now);
-  const swapped = HIKES.filter((h) => REPLACED[h.id]?.[1].some((a) => hasKw(q, a)))
-    .map((h) => `<p><b>${esc(REPLACED[h.id][0])} is off the plan:</b> ${esc(h.shortName)} replaces it on <b>${esc(h.dateShort)}</b>.</p>`);
+  const swapped = HIKES.flatMap((h) => (REPLACED[h.id] || [])
+    .filter(([, names]) => names.some((a) => hasKw(q, a)))
+    .map(([name]) => `<p><b>${esc(name)} is off the plan:</b> ${esc(h.shortName)} replaces it on <b>${esc(h.dateShort)}</b>.</p>`));
   return [...new Set(moved)]
     .map((h) => `<p><b>${esc(h.shortName)} moved:</b> it's now on <b>${esc(h.dateLong)}</b>, not ${esc(h.movedFrom.dateShort)}.</p>`)
     .concat(swapped)

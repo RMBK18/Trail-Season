@@ -438,7 +438,7 @@ body.kb .tabbar { display: none; }
 .hero-date { font-size: 15px; font-weight: 700; color: var(--amber); }
 .hero-title { margin-top: 4px; font-size: 30px; line-height: 1.12; font-weight: 800; text-wrap: balance; }
 .hero-area { margin-top: 4px; font-size: 16px; color: rgba(251, 243, 228, 0.8); }
-.hero-badges { display: flex; gap: 6px; margin-top: 12px; }
+.hero-badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
 .hero .badge-opt { background: rgba(20, 42, 30, 0.55); }
 .hero .badge-easy.badge-opt { color: #9fdcae; box-shadow: inset 0 0 0 1.5px #9fdcae; }
 .hero .badge-moderate.badge-opt { color: var(--amber); box-shadow: inset 0 0 0 1.5px var(--amber); }
@@ -829,7 +829,7 @@ button.ans-link { border: 0; cursor: pointer; }
 .link-btn { padding: 0; border: 0; background: none; color: var(--link); font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
 
 /* ── Carpool: rides list ── */
-.block-rides { scroll-margin-top: calc(var(--safe-t) + 56px); }
+.block-rides, .block-updates { scroll-margin-top: calc(var(--safe-t) + 56px); }
 .block-rides > .muted { margin-top: 0; }
 [data-rides] .sub-h { margin-top: 16px; }
 .ride-list { display: grid; gap: 8px; margin: 6px 0 0; padding: 0; list-style: none; }

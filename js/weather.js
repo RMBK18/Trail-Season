@@ -11,8 +11,8 @@ const COORDS = {
   'forks-of-the-credit': { lat: 43.9069, lng: -80.0603, name: 'Forks of the Credit' },
   'dundas-valley': { lat: 43.2475, lng: -80.0081, name: 'Dundas Valley' },
   'rattlesnake-point': { lat: 43.4697, lng: -79.9095, name: 'Rattlesnake Point' },
-  'crawford-lake': { lat: 43.4683, lng: -79.9486, name: 'Crawford Lake' },
-  'mount-nemo': { lat: 43.4207, lng: -79.8566, name: 'Mount Nemo' },
+  'mono-cliffs': { lat: 44.0467, lng: -80.0769, name: 'Mono Cliffs' },
+  'bronte-creek': { lat: 43.4139, lng: -79.7667, name: 'Bronte Creek' },
 };
 
 const CACHE_HOURS = 6;
